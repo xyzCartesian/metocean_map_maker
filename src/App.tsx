@@ -1,6 +1,8 @@
+import "./App.css";
 import { useEffect } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+
 
 function App() {
 
@@ -10,21 +12,20 @@ function App() {
       container: "map",
       style: "https://demotiles.maplibre.org/style.json",
       center: [0, 0],
-      zoom: 2
+      zoom: 2,
     });
 
-    // add zoom controls
     map.addControl(
       new maplibregl.NavigationControl(),
       "top-right"
     );
 
-    // add scale control
     map.addControl(
       new maplibregl.ScaleControl({
         maxWidth: 150,
-        unit: "metric"
-      })
+        unit: "metric",
+      }),
+      "bottom-left"
     );
 
     return () => map.remove();
@@ -32,13 +33,45 @@ function App() {
   }, []);
 
   return (
-    <div
-      id="map"
-      style={{
-        width: "100vw",
-        height: "100vh"
-      }}
-    />
+    <>
+      <div id="map" />
+
+      <div className="control-panel">
+        <h2>Metocean Map Maker</h2>
+
+        <h3>Layers</h3>
+
+        <label>
+          <input type="checkbox" defaultChecked />
+          Basemap
+        </label>
+
+        <label>
+          <input type="checkbox" />
+          Bathymetry
+        </label>
+
+        <label>
+          <input type="checkbox" />
+          Topography
+        </label>
+
+        <label>
+          <input type="checkbox" />
+          Structures
+        </label>
+
+        <label>
+          <input type="checkbox" />
+          Measurements
+        </label>
+
+        <label>
+          <input type="checkbox" />
+          Models
+        </label>
+      </div>
+    </>
   );
 }
 
