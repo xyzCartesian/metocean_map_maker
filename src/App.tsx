@@ -2,6 +2,7 @@ import "./App.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import Papa from "papaparse";
 
 type MarkerCategory =
   | "Offshore structure"
@@ -277,6 +278,69 @@ function App() {
     }
   }
 
+  function handleCsvImport(
+    event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+
+      complete: (results: { data: any[]; }) => {
+
+        const importedMarkers: MarkerData[] = 
+          results.data.map((row: any) => {
+            const lat = Number(row.Latitude);
+            const lon = Number(row.Longitude);
+
+            if (
+              !Number.isFinite(lat) ||
+              !Number.isFinite(lon) ||
+              lat < -90 ||
+              lat > 90 ||
+              lon < -180 ||
+              lon > 180
+            ) {
+              return null; // Skip invalid rows
+            }
+
+            return {
+              id: Date.now() + Math.random(), // Unique ID
+              name: row.Name || "Unnamed point",
+              lat,
+              lon,
+              category: row.Category as MarkerCategory,
+            };
+          })
+          .filter(Boolean) as MarkerData[]; // Filter out nulls
+        
+          setMarkers(prev => [
+            ...prev,
+            ...importedMarkers
+          ]);
+
+          const bounds = 
+            new maplibregl.LngLatBounds();
+
+          importedMarkers.forEach((marker) => {
+            bounds.extend([
+            marker.lon,
+            marker.lat
+            ])
+          });
+
+          mapRef.current?.fitBounds(
+            bounds,
+            {
+              padding: 50
+            }
+        );
+        },
+    });
+  }
+  
+
   function clearMarkers() {
     setMarkers([]);
     cancelEditingMarker();
@@ -452,6 +516,14 @@ function App() {
             </button>
           </>
         )}
+
+        <h3>Import CSV</h3>
+          
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleCsvImport}  
+        />
 
         <h3>Markers by category</h3>
 
