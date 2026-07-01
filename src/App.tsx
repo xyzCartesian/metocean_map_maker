@@ -3,6 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Papa from "papaparse";
+import {
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react"
 
 type MarkerCategory =
   | "Offshore structure"
@@ -97,7 +101,7 @@ function App() {
   const [pointLat, setPointLat] = useState("");
   const [pointLon, setPointLon] = useState("");
 
-  const [pointLabel, setPointLabel] = useState("New point");
+  const [pointLabel] = useState("New point");
 
   const [showMarkerLabels, setShowMarkerLabels] = useState(true);
   const [labelFontSize, setLabelFontSize] = useState(12);
@@ -128,6 +132,16 @@ function App() {
   const [editLabel, setEditLabel] = useState("");
   const [editCategory, setEditCategory] =
     useState<MarkerCategory>("Offshore structure");
+
+  const [panelSections, setPanelSections] = useState({
+    mapLayers: true,
+    markerVisibility: true,
+    pointDetails: true,
+    importCsv: false,
+    markersByCategory: false,
+    markerLabels: false,
+    markerStyles: false,
+  });
 
   useEffect(() => {
     addingPointRef.current = addingPoint;
@@ -463,6 +477,16 @@ function App() {
     return markers.filter((marker) => marker.category === category);
   }
 
+  function toggleSection(
+    section: keyof typeof panelSections
+  ) {
+    setPanelSections((previous) => ({
+      ...previous,
+      [section]: !previous[section],
+    }));
+  }
+  
+
   return (
     <>
       <div id="map" />
@@ -470,8 +494,19 @@ function App() {
       <div className="control-panel">
         <h2>Metocean Map Maker</h2>
 
-        <h3>Map layers</h3>
+        <div
+          className="section-header"
+          onClick={() => toggleSection("mapLayers")}
+        >
+          {panelSections.mapLayers
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Map layers
+        </div>
 
+        {panelSections.mapLayers && (
+          <>
         <label>
           <input type="checkbox" defaultChecked />
           Basemap
@@ -486,61 +521,87 @@ function App() {
           <input type="checkbox" />
           Topography
         </label>
+        </>
+        )}
 
-        <h3>Marker visibility</h3>
+        <div
+          className="section-header"
+          onClick={() => toggleSection("markerVisibility")}
+        >
+          {panelSections["markerVisibility"]
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Marker visibility
+        </div>
 
-        {markerCategories.map((category) => (
-          <label key={category} className="category-toggle">
+        {panelSections["markerVisibility"] && (
+          <>
+          {markerCategories.map((category) => (
+            <label key={category} className="category-toggle">
+              <input
+                type="checkbox"
+                checked={visibleCategories[category]}
+                onChange={() => toggleCategory(category)}
+              />
+              <span
+                className="category-dot"
+                style={{ backgroundColor: markerStyles[category].colour }}
+              />
+              {category}
+            </label>
+          ))}
+          </>
+        )}
+
+        <div
+          className="section-header"
+          onClick={() => toggleSection("pointDetails")}
+        >
+          {panelSections["pointDetails"]
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Point details
+        </div>
+
+        {panelSections["pointDetails"] && (
+          <>
+          <label>
+            Name
             <input
-              type="checkbox"
-              checked={visibleCategories[category]}
-              onChange={() => toggleCategory(category)}
+              className="text-input"
+              value={pointName}
+              onChange={(event) => setPointName(event.target.value)}
+              placeholder="e.g. Bonga buoy"
             />
-            <span
-              className="category-dot"
-              style={{ backgroundColor: markerStyles[category].colour }}
-            />
-            {category}
           </label>
-        ))}
 
-        
+          <label>
+            Map label 
+            <input
+              className="text-input"
+              value={editLabel}
+              onChange={(event) => setEditLabel(event.target.value)}
+            /> 
+          </label>
 
-        <h3>Point details</h3>
-
-        <label>
-          Name
-          <input
-            className="text-input"
-            value={pointName}
-            onChange={(event) => setPointName(event.target.value)}
-            placeholder="e.g. Bonga buoy"
-          />
-        </label>
-
-        <label>
-          Map label 
-          <input
-            className="text-input"
-            value={editLabel}
-            onChange={(event) => setEditLabel(event.target.value)}
-          /> 
-        </label>
-
-        <label>
-          Category
-          <select
-            className="text-input"
-            value={selectedCategory}
-            onChange={(event) =>
-              setSelectedCategory(event.target.value as MarkerCategory)
-            }
-          >
-            {markerCategories.map((category) => (
-              <option key={category}>{category}</option>
-            ))}
-          </select>
-        </label>
+          <label>
+            Category
+            <select
+              className="text-input"
+              value={selectedCategory}
+              onChange={(event) =>
+                setSelectedCategory(event.target.value as MarkerCategory)
+              }
+            >
+              {markerCategories.map((category) => (
+                <option key={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          </>
+        )}
 
         <h3>Add by map click</h3>
 
@@ -655,128 +716,168 @@ function App() {
 
         <h3>Markers by category</h3>
 
-        <p className="marker-count">Total markers: {markers.length}</p>
+        <div
+          className="section-header"
+          onClick={() => toggleSection("markersByCategory")}
+        >
+          {panelSections["markersByCategory"]
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Markers by category
+        </div>  
 
-        {markerCategories.map((category) => {
-          const categoryMarkers = getMarkersForCategory(category);
+        {panelSections["markersByCategory"] && (
+          <>
+          <p className="marker-count">Total markers: {markers.length}</p>
 
-          return (
-            <div key={category} className="marker-category-group">
-              <div className="marker-category-heading">
+          {markerCategories.map((category) => {
+            const categoryMarkers = getMarkersForCategory(category);
+
+            return (
+              <div key={category} className="marker-category-group">
+                <div className="marker-category-heading">
+                  <span
+                    className="category-dot"
+                    style={{ backgroundColor: markerStyles[category].colour }}
+                  />
+                  <strong>{category}</strong>
+                  <span className="category-count">
+                    {categoryMarkers.length}
+                  </span>
+                </div>
+
+                {categoryMarkers.length === 0 && (
+                  <p className="empty-category-text">No markers</p>
+                )}
+
+                {categoryMarkers.map((marker) => (
+                  <div key={marker.id} className="marker-list-item">
+                    <div>
+                      <strong>{marker.name}</strong>
+                      <br />
+                      <span>
+                        {marker.lat.toFixed(5)}, {marker.lon.toFixed(5)}
+                      </span>
+                    </div>
+
+                    <div className="marker-actions">
+                      <button
+                        className="small-button"
+                        onClick={() => startEditingMarker(marker)}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        className="small-button danger-button"
+                        onClick={() => deleteMarker(marker.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </>
+        )}  
+
+        <div
+          className="section-header"
+          onClick={() => toggleSection("markerLabels") }
+        >
+          {panelSections["markersByCategory"]
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Marker labels
+        </div> 
+
+        {panelSections["markerLabels"] && (
+          <>
+          <label>
+            <input
+              type="checkbox"
+              checked={showMarkerLabels}
+              onChange={(event) => setShowMarkerLabels(event.target.checked)}
+            />
+            Show labels
+          </label>
+
+          <label>
+            Label font size: {labelFontSize}px
+            <input
+              className="range-input"
+              type="range"
+              min="8"
+              max="24"
+              value={labelFontSize}
+              onChange={(event) => setLabelFontSize(Number(event.target.value))}
+            />    
+          </label>
+          </>
+        )}
+
+        <div
+          className="section-header"
+          onClick={() => toggleSection("markerStyles") }
+        >
+          {panelSections["markersByCategory"]
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Marker styles
+        </div> 
+
+        {panelSections["markerStyles"] && (
+          <>
+          {markerCategories.map((category) => (
+            <div key={category} className="marker-style-row">
+              <div className = "marker-style-heading">
                 <span
                   className="category-dot"
-                  style={{ backgroundColor: markerStyles[category].colour }}
+                  style = {{ backgroundColor: markerStyles[category].colour }}
                 />
                 <strong>{category}</strong>
-                <span className="category-count">
-                  {categoryMarkers.length}
-                </span>
               </div>
+              <label>
+                Colour
+                <input
+                  className="colour-input"
+                  type="color"
+                  value={markerStyles[category].colour}
+                  onChange={(event) => 
+                    setMarkerStyles((previous) => ({
+                      ...previous,
+                      [category]: { ...previous[category], colour: event.target.value },
+                    }))
+                  }
+                />
+              </label>
 
-              {categoryMarkers.length === 0 && (
-                <p className="empty-category-text">No markers</p>
-              )}
-
-              {categoryMarkers.map((marker) => (
-                <div key={marker.id} className="marker-list-item">
-                  <div>
-                    <strong>{marker.name}</strong>
-                    <br />
-                    <span>
-                      {marker.lat.toFixed(5)}, {marker.lon.toFixed(5)}
-                    </span>
-                  </div>
-
-                  <div className="marker-actions">
-                    <button
-                      className="small-button"
-                      onClick={() => startEditingMarker(marker)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      className="small-button danger-button"
-                      onClick={() => deleteMarker(marker.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <label>
+                Size: {markerStyles[category].size}px
+                <input
+                  className="range-input"
+                  type="range"
+                  min="8"
+                  max="36"
+                  value={markerStyles[category].size}
+                  onChange={(event) => 
+                    setMarkerStyles((previous) => ({
+                      ...previous,
+                      [category]: { ...previous[category], size: Number(event.target.value) },
+                    }))
+                  }
+                />
+              </label>
             </div>
-          );
-        })}
-
-
-        <h3>Marker labels</h3>
-
-        <label>
-          <input
-            type="checkbox"
-            checked={showMarkerLabels}
-            onChange={(event) => setShowMarkerLabels(event.target.checked)}
-          />
-          Show labels
-        </label>
-
-        <label>
-          Label font size: {labelFontSize}px
-          <input
-            className="range-input"
-            type="range"
-            min="8"
-            max="24"
-            value={labelFontSize}
-            onChange={(event) => setLabelFontSize(Number(event.target.value))}
-          />    
-        </label>
-
-        <h3>Marker styles</h3>
-
-        {markerCategories.map((category) => (
-          <div key={category} className="marker-style-row">
-            <div className = "marker-style-heading">
-              <span
-                className="category-dot"
-                style = {{ backgroundColor: markerStyles[category].colour }}
-              />
-              <strong>{category}</strong>
-            </div>
-            <label>
-              Colour
-              <input
-                className="colour-input"
-                type="color"
-                value={markerStyles[category].colour}
-                onChange={(event) => 
-                  setMarkerStyles((previous) => ({
-                    ...previous,
-                    [category]: { ...previous[category], colour: event.target.value },
-                  }))
-                }
-              />
-            </label>
-
-            <label>
-              Size: {markerStyles[category].size}px
-              <input
-                className="range-input"
-                type="range"
-                min="8"
-                max="36"
-                value={markerStyles[category].size}
-                onChange={(event) => 
-                  setMarkerStyles((previous) => ({
-                    ...previous,
-                    [category]: { ...previous[category], size: Number(event.target.value) },
-                  }))
-                }
-              />
-            </label>
-          </div>
-        ))}
-      </div>
+          ))}
+          </>
+        )}
+        </div>
 
       
       <div className={helpPanelOpen ? "help-panel open" : "help-panel collapsed"}>
