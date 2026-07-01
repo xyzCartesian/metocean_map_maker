@@ -218,3 +218,192 @@ body,
 .danger-button:hover {
   background: #e8b5b5;
 }
+
+.help-panel {
+    position: absolute;
+
+    bottom: 15px;
+    right: 15px;
+
+    width: 260px;
+
+    background: white;
+
+    border-radius: 10px;
+
+    padding: 15px;
+
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+
+    z-index: 1000;
+
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+.help-panel.collapsed {
+  width: auto;
+  height: auto;
+
+  background: transparent;
+  
+  padding: 0;
+  margin: 0;
+
+  box-shadow: none;
+  border: none;
+}
+
+.help-panel-toggle {
+  position: absolute;
+
+  top: 0px;
+  right: 0px;
+
+  min-width: 70px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: #005eb8;
+  color: white;
+
+  font-weight: bold;
+  font-size: 14px;
+
+  cursor: pointer;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.help-panel-toggle:hover {
+  background: #004a93;
+}
+
+.help-panel.open .help-panel-toggle {
+  top: 10px;
+  right: 10px;
+  bottom: auto;
+
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+
+  padding:0;
+
+  border-radius: 50%;
+}
+
+.help-panel-content h3 {
+  margin-top: 0;
+  margin-right: 35px;
+  margin-bottom: 10px;
+
+  font-size: 16px;
+}
+
+.help-panel-content h4 {
+  margin-bottom: 8px;
+}
+
+.help-panel-content hr {
+  border: none;
+  border-top: 1px solid #dddddd;
+
+  margin: 12px 0;
+}
+
+.help-text {
+  color: #666666;
+
+  font-size: 12px;
+
+  margin-bottom: 6px;
+}
+
+.help-panel code {
+  display: block;
+
+  background: #f5f5f5;
+
+  padding: 8px;
+
+  border-radius: 4px;
+
+  font-size: 12px;
+
+  overflow-wrap: anywhere;
+}
+
+.example-links {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+
+  margin-top: 10px;
+}
+
+.example-links a {
+  text-decoration: none;
+
+  color: #005eb8;
+
+  font-weight: 500;
+}
+
+.example-links a:hover {
+  text-decoration: underline;
+}
+
+.example-links {
+    
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+
+  margin-top: 10px;
+}
+
+.example-links a {
+
+  text-decoration: none;
+
+  color: #005eb8;
+
+  font-weight: 500;
+}
+
+.example-links a:hover {
+
+  text-decoration: underline;
+
+}
+
+
+.help-text {
+
+  color: #666;
+
+  font-size: 12px;
+
+  margin-bottom: 5px;
+}
+
+.help-panel code {
+
+  display: block;
+
+  background: #f5f5f5;
+
+  padding: 8px;
+
+  border-radius: 4px;
+
+  font-size: 12px;
+
+  overflow-wrap: anywhere;
+}

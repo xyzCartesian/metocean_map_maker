@@ -42,6 +42,7 @@ function App() {
   const addingPointRef = useRef(false);
   const selectedCategoryRef = useRef<MarkerCategory>("Offshore structure");
   const pointNameRef = useRef("New point");
+  const [helpPanelOpen, setHelpPanelOpen] = useState(false);
 
   const [addingPoint, setAddingPoint] = useState(false);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
@@ -159,6 +160,7 @@ function App() {
       markerObjectsRef.current.push(marker);
     });
   }, [markers, visibleCategories]);
+
 
   function addPointFromCoordinates() {
     const lat = Number(pointLat);
@@ -329,6 +331,33 @@ function App() {
             marker.lat
             ])
           });
+
+          if (
+            importedMarkers.length === 1 && 
+            mapRef.current
+          ) {
+            mapRef.current.flyTo({
+              center: [
+                importedMarkers[0].lon,
+                importedMarkers[0].lat
+              ],
+              zoom:8
+            });
+          }
+          else if (
+            importedMarkers.length > 1 && 
+            mapRef.current
+          ) {
+            const bounds = 
+              new maplibregl.LngLatBounds();
+
+            importedMarkers.forEach((marker) => {
+              bounds.extend([
+                marker.lon,
+                marker.lat
+              ])
+            })
+          }
 
           mapRef.current?.fitBounds(
             bounds,
@@ -583,6 +612,50 @@ function App() {
         <button className="secondary-button" onClick={clearMarkers}>
           Clear all markers
         </button>
+      </div>
+
+      <div className={helpPanelOpen ? "help-panel open" : "help-panel collapsed"}>
+
+        <button
+          className="help-panel-toggle"
+          onClick={() => setHelpPanelOpen(!helpPanelOpen)}
+        >
+          {helpPanelOpen ? "×" : "? Help"}
+        </button>
+
+        {helpPanelOpen && (
+          <div className="help-panel-content">
+
+            <h3>Help & Examples</h3>
+
+            <p className="help-text">
+              CSV files must contain the following columns:
+            </p>
+
+            <code>
+              Name,Latitude,Longitude,Category
+            </code>
+
+            <p className="help-text">
+              Latitude and longitude should be in WGS84 decimal degrees.
+            </p>
+
+            <hr />
+
+            <h4>Example Files</h4>
+
+            <div className="example-links">
+              <a
+                href="/examples/Example_Measured_Data.csv"
+                download
+              >
+                Measured Data CSV
+              </a>
+            </div>
+
+          </div>
+        )}
+
       </div>
     </>
   );
