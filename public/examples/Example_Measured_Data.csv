@@ -1,3 +1,3 @@
-Name,Latitude,Longitude,Category,Subtype
-Bonga FPSO,4.55,4.65,Offshore structure,FPSO
-BGA SPM AWS,4.6,6.7,Measured wind,AWS
+Name,Label,Latitude,Longitude,Category,Subtype
+Bonga FPSO,FPSO,4.55,4.65,Offshore structure,FPSO
+BGA SPM AWS,BGA-SPM-wi,4.6,6.7,Measured wind,AWS

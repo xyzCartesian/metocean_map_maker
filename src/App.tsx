@@ -18,9 +18,15 @@ type MarkerCategory =
 type MarkerData = {
   id: number;
   name: string;
+  label: string;
   lat: number;
   lon: number;
   category: MarkerCategory;
+};
+
+type MarkerStyle = {
+  colour: string;
+  size: number;
 };
 
 const markerCategories: MarkerCategory[] = [
@@ -35,6 +41,45 @@ const markerCategories: MarkerCategory[] = [
   "Model combination",
 ];
 
+const defaultMarkerStyles: Record<MarkerCategory, MarkerStyle> = {
+  "Offshore structure": {
+    colour: "#d7191c",
+    size: 18,
+  },
+  "Measured wind": {
+    colour: "#2c7bb6",
+    size: 16,
+  },
+  "Measured wave": {
+    colour: "#00a6ca",
+    size: 16,
+  },
+  "Measured current": {
+    colour: "#00ccbc",
+    size: 16,
+  },
+  "Measured combination": {
+    colour: "#90eb9d",
+    size: 16,
+  },
+  "Model wind": {
+    colour: "#fdae61",
+    size: 14,
+  },
+  "Model wave": {
+    colour: "#f46d43",
+    size: 14,
+  },
+  "Model current": {
+    colour: "#abdda4",
+    size: 14,
+  },
+  "Model combination": {
+    colour: "#ffffbf",
+    size: 14,
+  },
+};
+
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjectsRef = useRef<maplibregl.Marker[]>([]);
@@ -42,6 +87,7 @@ function App() {
   const addingPointRef = useRef(false);
   const selectedCategoryRef = useRef<MarkerCategory>("Offshore structure");
   const pointNameRef = useRef("New point");
+  const pointLabelRef = useRef("New point");
   const [helpPanelOpen, setHelpPanelOpen] = useState(false);
 
   const [addingPoint, setAddingPoint] = useState(false);
@@ -50,6 +96,14 @@ function App() {
   const [pointName, setPointName] = useState("New point");
   const [pointLat, setPointLat] = useState("");
   const [pointLon, setPointLon] = useState("");
+
+  const [pointLabel, setPointLabel] = useState("New point");
+
+  const [showMarkerLabels, setShowMarkerLabels] = useState(true);
+  const [labelFontSize, setLabelFontSize] = useState(12);
+
+  const [markerStyles, setMarkerStyles] = 
+    useState<Record<MarkerCategory, MarkerStyle>>(defaultMarkerStyles);
 
   const [selectedCategory, setSelectedCategory] =
     useState<MarkerCategory>("Offshore structure");
@@ -71,6 +125,7 @@ function App() {
   const [editName, setEditName] = useState("");
   const [editLat, setEditLat] = useState("");
   const [editLon, setEditLon] = useState("");
+  const [editLabel, setEditLabel] = useState("");
   const [editCategory, setEditCategory] =
     useState<MarkerCategory>("Offshore structure");
 
@@ -85,6 +140,10 @@ function App() {
   useEffect(() => {
     pointNameRef.current = pointName;
   }, [pointName]);
+
+  useEffect(() => {
+    pointLabelRef.current = pointLabel;
+  }, [pointLabel]);
 
   useEffect(() => {
     const map = new maplibregl.Map({
@@ -112,6 +171,7 @@ function App() {
       const newMarker: MarkerData = {
         id: Date.now(),
         name: pointNameRef.current || "New point",
+        label: pointLabelRef.current || pointNameRef.current || "New point",
         lon: event.lngLat.lng,
         lat: event.lngLat.lat,
         category: selectedCategoryRef.current,
@@ -137,19 +197,38 @@ function App() {
     );
 
     visibleMarkers.forEach((markerData) => {
-      const colour = getMarkerColour(markerData.category);
+      const markerStyle = markerStyles[markerData.category];
 
       const markerElement = document.createElement("div");
-      markerElement.className = "metocean-marker";
-      markerElement.style.backgroundColor = colour;
+      markerElement.className = "metocean-marker-wrapper";
 
+      const markerDot = document.createElement("div");
+      markerDot.className = "metocean-marker-dot";
+      markerDot.style.backgroundColor = markerStyle.colour;
+      markerDot.style.width = `${markerStyle.size}px`;
+      markerDot.style.height = `${markerStyle.size}px`;
+
+      markerElement.appendChild(markerDot);
+
+      if (showMarkerLabels) {
+        const markerLabel = document.createElement("div");
+        markerLabel.className = "metocean-marker-label";
+        markerLabel.textContent = markerData.label || markerData.name;
+        markerLabel.style.fontSize = `${labelFontSize}px`;
+
+        markerElement.appendChild(markerLabel);
+      }
+
+     
       const marker = new maplibregl.Marker({
         element: markerElement,
+        anchor: "center",
       })
         .setLngLat([markerData.lon, markerData.lat])
         .setPopup(
           new maplibregl.Popup({ offset: 25 }).setHTML(`
             <strong>${markerData.name}</strong><br/>
+            Label: ${markerData.label}<br/>
             Category: ${markerData.category}<br/>
             Lat: ${markerData.lat.toFixed(5)}<br/>
             Lon: ${markerData.lon.toFixed(5)}
@@ -159,7 +238,7 @@ function App() {
 
       markerObjectsRef.current.push(marker);
     });
-  }, [markers, visibleCategories]);
+  }, [markers, visibleCategories, showMarkerLabels, labelFontSize, markerStyles]);
 
 
   function addPointFromCoordinates() {
@@ -184,6 +263,7 @@ function App() {
     const newMarker: MarkerData = {
       id: Date.now(),
       name: pointName || "New point",
+      label: pointLabel || pointName || "New point",
       lat,
       lon,
       category: selectedCategory,
@@ -214,6 +294,7 @@ function App() {
     setEditName(marker.name);
     setEditLat(String(marker.lat));
     setEditLon(String(marker.lon));
+    setEditLabel(marker.label);
     setEditCategory(marker.category);
   }
 
@@ -222,6 +303,7 @@ function App() {
     setEditName("");
     setEditLat("");
     setEditLon("");
+    setEditLabel(""); 
     setEditCategory("Offshore structure");
   }
 
@@ -255,6 +337,7 @@ function App() {
               lat,
               lon,
               category: editCategory,
+              label: editLabel || editName || "Unnamed point",
             }
           : marker
       )
@@ -310,6 +393,7 @@ function App() {
             return {
               id: Date.now() + Math.random(), // Unique ID
               name: row.Name || "Unnamed point",
+              label: row.Label || row.Name || "Unnamed point",
               lat,
               lon,
               category: row.Category as MarkerCategory,
@@ -414,11 +498,13 @@ function App() {
             />
             <span
               className="category-dot"
-              style={{ backgroundColor: getMarkerColour(category) }}
+              style={{ backgroundColor: markerStyles[category].colour }}
             />
             {category}
           </label>
         ))}
+
+        
 
         <h3>Point details</h3>
 
@@ -430,6 +516,15 @@ function App() {
             onChange={(event) => setPointName(event.target.value)}
             placeholder="e.g. Bonga buoy"
           />
+        </label>
+
+        <label>
+          Map label 
+          <input
+            className="text-input"
+            value={editLabel}
+            onChange={(event) => setEditLabel(event.target.value)}
+          /> 
         </label>
 
         <label>
@@ -553,6 +648,10 @@ function App() {
           accept=".csv"
           onChange={handleCsvImport}  
         />
+       
+        <button className="secondary-button" onClick={clearMarkers}>
+          Clear all markers
+        </button>
 
         <h3>Markers by category</h3>
 
@@ -566,7 +665,7 @@ function App() {
               <div className="marker-category-heading">
                 <span
                   className="category-dot"
-                  style={{ backgroundColor: getMarkerColour(category) }}
+                  style={{ backgroundColor: markerStyles[category].colour }}
                 />
                 <strong>{category}</strong>
                 <span className="category-count">
@@ -609,11 +708,77 @@ function App() {
           );
         })}
 
-        <button className="secondary-button" onClick={clearMarkers}>
-          Clear all markers
-        </button>
+
+        <h3>Marker labels</h3>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={showMarkerLabels}
+            onChange={(event) => setShowMarkerLabels(event.target.checked)}
+          />
+          Show labels
+        </label>
+
+        <label>
+          Label font size: {labelFontSize}px
+          <input
+            className="range-input"
+            type="range"
+            min="8"
+            max="24"
+            value={labelFontSize}
+            onChange={(event) => setLabelFontSize(Number(event.target.value))}
+          />    
+        </label>
+
+        <h3>Marker styles</h3>
+
+        {markerCategories.map((category) => (
+          <div key={category} className="marker-style-row">
+            <div className = "marker-style-heading">
+              <span
+                className="category-dot"
+                style = {{ backgroundColor: markerStyles[category].colour }}
+              />
+              <strong>{category}</strong>
+            </div>
+            <label>
+              Colour
+              <input
+                className="colour-input"
+                type="color"
+                value={markerStyles[category].colour}
+                onChange={(event) => 
+                  setMarkerStyles((previous) => ({
+                    ...previous,
+                    [category]: { ...previous[category], colour: event.target.value },
+                  }))
+                }
+              />
+            </label>
+
+            <label>
+              Size: {markerStyles[category].size}px
+              <input
+                className="range-input"
+                type="range"
+                min="8"
+                max="36"
+                value={markerStyles[category].size}
+                onChange={(event) => 
+                  setMarkerStyles((previous) => ({
+                    ...previous,
+                    [category]: { ...previous[category], size: Number(event.target.value) },
+                  }))
+                }
+              />
+            </label>
+          </div>
+        ))}
       </div>
 
+      
       <div className={helpPanelOpen ? "help-panel open" : "help-panel collapsed"}>
 
         <button
@@ -633,11 +798,15 @@ function App() {
             </p>
 
             <code>
-              Name,Latitude,Longitude,Category
+              Name,Label,Latitude,Longitude,Category
             </code>
 
             <p className="help-text">
               Latitude and longitude should be in WGS84 decimal degrees.
+            </p>
+
+            <p className="help-text">
+              Label is optional. If not provided, the Name will be used as the label.
             </p>
 
             <hr />
