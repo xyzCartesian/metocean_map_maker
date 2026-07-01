@@ -22,6 +22,18 @@ type MarkerData = {
   category: MarkerCategory;
 };
 
+const markerCategories: MarkerCategory[] = [
+  "Offshore structure",
+  "Measured wind",
+  "Measured wave",
+  "Measured current",
+  "Measured combination",
+  "Model wind",
+  "Model wave",
+  "Model current",
+  "Model combination",
+];
+
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjectsRef = useRef<maplibregl.Marker[]>([]);
@@ -31,7 +43,6 @@ function App() {
   const pointNameRef = useRef("New point");
 
   const [addingPoint, setAddingPoint] = useState(false);
-
   const [markers, setMarkers] = useState<MarkerData[]>([]);
 
   const [pointName, setPointName] = useState("New point");
@@ -39,6 +50,26 @@ function App() {
   const [pointLon, setPointLon] = useState("");
 
   const [selectedCategory, setSelectedCategory] =
+    useState<MarkerCategory>("Offshore structure");
+
+  const [visibleCategories, setVisibleCategories] =
+    useState<Record<MarkerCategory, boolean>>({
+      "Offshore structure": true,
+      "Measured wind": true,
+      "Measured wave": true,
+      "Measured current": true,
+      "Measured combination": true,
+      "Model wind": true,
+      "Model wave": true,
+      "Model current": true,
+      "Model combination": true,
+    });
+
+  const [editingMarkerId, setEditingMarkerId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLat, setEditLat] = useState("");
+  const [editLon, setEditLon] = useState("");
+  const [editCategory, setEditCategory] =
     useState<MarkerCategory>("Offshore structure");
 
   useEffect(() => {
@@ -99,7 +130,11 @@ function App() {
 
     if (!mapRef.current) return;
 
-    markers.forEach((markerData) => {
+    const visibleMarkers = markers.filter(
+      (markerData) => visibleCategories[markerData.category]
+    );
+
+    visibleMarkers.forEach((markerData) => {
       const colour = getMarkerColour(markerData.category);
 
       const markerElement = document.createElement("div");
@@ -122,7 +157,7 @@ function App() {
 
       markerObjectsRef.current.push(marker);
     });
-  }, [markers]);
+  }, [markers, visibleCategories]);
 
   function addPointFromCoordinates() {
     const lat = Number(pointLat);
@@ -164,8 +199,91 @@ function App() {
     setPointLon("");
   }
 
+  function toggleCategory(category: MarkerCategory) {
+    setVisibleCategories((previous) => ({
+      ...previous,
+      [category]: !previous[category],
+    }));
+  }
+
+  function startEditingMarker(marker: MarkerData) {
+    setEditingMarkerId(marker.id);
+    setEditName(marker.name);
+    setEditLat(String(marker.lat));
+    setEditLon(String(marker.lon));
+    setEditCategory(marker.category);
+  }
+
+  function cancelEditingMarker() {
+    setEditingMarkerId(null);
+    setEditName("");
+    setEditLat("");
+    setEditLon("");
+    setEditCategory("Offshore structure");
+  }
+
+  function saveEditedMarker() {
+    if (editingMarkerId === null) return;
+
+    const lat = Number(editLat);
+    const lon = Number(editLon);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      alert("Please enter valid numeric latitude and longitude values.");
+      return;
+    }
+
+    if (lat < -90 || lat > 90) {
+      alert("Latitude must be between -90 and 90 degrees.");
+      return;
+    }
+
+    if (lon < -180 || lon > 180) {
+      alert("Longitude must be between -180 and 180 degrees.");
+      return;
+    }
+
+    setMarkers((previousMarkers) =>
+      previousMarkers.map((marker) =>
+        marker.id === editingMarkerId
+          ? {
+              ...marker,
+              name: editName || "Unnamed point",
+              lat,
+              lon,
+              category: editCategory,
+            }
+          : marker
+      )
+    );
+
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: [lon, lat],
+        zoom: Math.max(mapRef.current.getZoom(), 5),
+      });
+    }
+
+    cancelEditingMarker();
+  }
+
+  function deleteMarker(markerId: number) {
+    setMarkers((previousMarkers) =>
+      previousMarkers.filter((marker) => marker.id !== markerId)
+    );
+
+    if (editingMarkerId === markerId) {
+      cancelEditingMarker();
+    }
+  }
+
   function clearMarkers() {
     setMarkers([]);
+    cancelEditingMarker();
+  }
+
+  function getMarkersForCategory(category: MarkerCategory) {
+    return markers.filter((marker) => marker.category === category);
   }
 
   return (
@@ -175,7 +293,7 @@ function App() {
       <div className="control-panel">
         <h2>Metocean Map Maker</h2>
 
-        <h3>Layers</h3>
+        <h3>Map layers</h3>
 
         <label>
           <input type="checkbox" defaultChecked />
@@ -192,20 +310,22 @@ function App() {
           Topography
         </label>
 
-        <label>
-          <input type="checkbox" defaultChecked />
-          Structures
-        </label>
+        <h3>Marker visibility</h3>
 
-        <label>
-          <input type="checkbox" defaultChecked />
-          Measurements
-        </label>
-
-        <label>
-          <input type="checkbox" defaultChecked />
-          Models
-        </label>
+        {markerCategories.map((category) => (
+          <label key={category} className="category-toggle">
+            <input
+              type="checkbox"
+              checked={visibleCategories[category]}
+              onChange={() => toggleCategory(category)}
+            />
+            <span
+              className="category-dot"
+              style={{ backgroundColor: getMarkerColour(category) }}
+            />
+            {category}
+          </label>
+        ))}
 
         <h3>Point details</h3>
 
@@ -228,22 +348,18 @@ function App() {
               setSelectedCategory(event.target.value as MarkerCategory)
             }
           >
-            <option>Offshore structure</option>
-            <option>Measured wind</option>
-            <option>Measured wave</option>
-            <option>Measured current</option>
-            <option>Measured combination</option>
-            <option>Model wind</option>
-            <option>Model wave</option>
-            <option>Model current</option>
-            <option>Model combination</option>
+            {markerCategories.map((category) => (
+              <option key={category}>{category}</option>
+            ))}
           </select>
         </label>
 
         <h3>Add by map click</h3>
 
         <button
-          className={addingPoint ? "primary-button active-button" : "primary-button"}
+          className={
+            addingPoint ? "primary-button active-button" : "primary-button"
+          }
           onClick={() => setAddingPoint(true)}
         >
           Click map to add point
@@ -281,14 +397,119 @@ function App() {
           Add coordinate point
         </button>
 
-        <h3>Current session</h3>
+        {editingMarkerId !== null && (
+          <>
+            <h3>Edit selected marker</h3>
 
-        <p className="marker-count">
-          Markers: {markers.length}
-        </p>
+            <label>
+              Name
+              <input
+                className="text-input"
+                value={editName}
+                onChange={(event) => setEditName(event.target.value)}
+              />
+            </label>
+
+            <label>
+              Category
+              <select
+                className="text-input"
+                value={editCategory}
+                onChange={(event) =>
+                  setEditCategory(event.target.value as MarkerCategory)
+                }
+              >
+                {markerCategories.map((category) => (
+                  <option key={category}>{category}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Latitude
+              <input
+                className="text-input"
+                value={editLat}
+                onChange={(event) => setEditLat(event.target.value)}
+              />
+            </label>
+
+            <label>
+              Longitude
+              <input
+                className="text-input"
+                value={editLon}
+                onChange={(event) => setEditLon(event.target.value)}
+              />
+            </label>
+
+            <button className="primary-button" onClick={saveEditedMarker}>
+              Save changes
+            </button>
+
+            <button className="secondary-button" onClick={cancelEditingMarker}>
+              Cancel edit
+            </button>
+          </>
+        )}
+
+        <h3>Markers by category</h3>
+
+        <p className="marker-count">Total markers: {markers.length}</p>
+
+        {markerCategories.map((category) => {
+          const categoryMarkers = getMarkersForCategory(category);
+
+          return (
+            <div key={category} className="marker-category-group">
+              <div className="marker-category-heading">
+                <span
+                  className="category-dot"
+                  style={{ backgroundColor: getMarkerColour(category) }}
+                />
+                <strong>{category}</strong>
+                <span className="category-count">
+                  {categoryMarkers.length}
+                </span>
+              </div>
+
+              {categoryMarkers.length === 0 && (
+                <p className="empty-category-text">No markers</p>
+              )}
+
+              {categoryMarkers.map((marker) => (
+                <div key={marker.id} className="marker-list-item">
+                  <div>
+                    <strong>{marker.name}</strong>
+                    <br />
+                    <span>
+                      {marker.lat.toFixed(5)}, {marker.lon.toFixed(5)}
+                    </span>
+                  </div>
+
+                  <div className="marker-actions">
+                    <button
+                      className="small-button"
+                      onClick={() => startEditingMarker(marker)}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      className="small-button danger-button"
+                      onClick={() => deleteMarker(marker.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
 
         <button className="secondary-button" onClick={clearMarkers}>
-          Clear markers
+          Clear all markers
         </button>
       </div>
     </>
