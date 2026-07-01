@@ -16,26 +16,109 @@ body,
   top: 15px;
   left: 15px;
 
-  width: 250px;
+  width: 290px;
+  max-height: calc(100vh - 30px);
+  overflow-y: auto;
 
   background: white;
-
   border-radius: 10px;
-
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 
   padding: 15px;
-
   z-index: 1000;
 
   font-family: Arial, sans-serif;
+  font-size: 14px;
 }
 
 .control-panel h2 {
   margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 20px;
+}
+
+.control-panel h3 {
+  margin-top: 18px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 4px;
 }
 
 .control-panel label {
   display: block;
   margin-bottom: 8px;
+}
+
+.text-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+
+  margin-top: 4px;
+  padding: 6px 8px;
+
+  border: 1px solid #bbb;
+  border-radius: 5px;
+
+  font-size: 14px;
+}
+
+.primary-button,
+.secondary-button {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 6px;
+
+  border: none;
+  border-radius: 6px;
+
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.primary-button {
+  background: #005eb8;
+  color: white;
+}
+
+.primary-button:hover {
+  background: #004a93;
+}
+
+.secondary-button {
+  background: #eeeeee;
+  color: #333333;
+}
+
+.secondary-button:hover {
+  background: #dddddd;
+}
+
+.active-button {
+  background: #00843d;
+}
+
+.instruction-text {
+  margin: 8px 0 0 0;
+  padding: 8px;
+  background: #e8f4ff;
+  border-left: 4px solid #005eb8;
+  font-size: 13px;
+}
+
+.marker-count {
+  font-weight: bold;
+}
+
+.metocean-marker {
+  width: 18px;
+  height: 18px;
+
+  border-radius: 50%;
+  border: 2px solid white;
+
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+
+  cursor: pointer;
 }
