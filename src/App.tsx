@@ -2,7 +2,7 @@ import "./App.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import Papa from "papaparse";
+import { importMarkersFromCsv } from "./utils/importMarkersFromCsv";
 import {
   ChevronDown,
   ChevronRight,
@@ -319,97 +319,34 @@ function App() {
     }
   }
 
-  function handleCsvImport(
-    event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  function handleCsvImport(event: React.ChangeEvent<HTMLInputElement>) {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
+  importMarkersFromCsv(file, (importedMarkers) => {
+    setMarkers((previous) => [...previous, ...importedMarkers]);
 
-      complete: (results: { data: any[]; }) => {
+    if (importedMarkers.length === 0) return;
 
-        const importedMarkers: MarkerData[] = 
-          results.data.map((row: any) => {
-            const lat = Number(row.Latitude);
-            const lon = Number(row.Longitude);
+    if (mapRef.current) {
+      if (importedMarkers.length === 1) {
+        mapRef.current.flyTo({
+          center: [importedMarkers[0].lon, importedMarkers[0].lat],
+          zoom: 8,
+        });
+      } else {
+        const bounds = new maplibregl.LngLatBounds();
 
-            if (
-              !Number.isFinite(lat) ||
-              !Number.isFinite(lon) ||
-              lat < -90 ||
-              lat > 90 ||
-              lon < -180 ||
-              lon > 180
-            ) {
-              return null; // Skip invalid rows
-            }
+        importedMarkers.forEach((marker) => {
+          bounds.extend([marker.lon, marker.lat]);
+        });
 
-            return {
-              id: Date.now() + Math.random(), // Unique ID
-              name: row.Name || "Unnamed point",
-              label: row.Label || row.Name || "Unnamed point",
-              lat,
-              lon,
-              category: row.Category as MarkerCategory,
-            };
-          })
-          .filter(Boolean) as MarkerData[]; // Filter out nulls
-        
-          setMarkers(prev => [
-            ...prev,
-            ...importedMarkers
-          ]);
-
-          const bounds = 
-            new maplibregl.LngLatBounds();
-
-          importedMarkers.forEach((marker) => {
-            bounds.extend([
-            marker.lon,
-            marker.lat
-            ])
-          });
-
-          if (
-            importedMarkers.length === 1 && 
-            mapRef.current
-          ) {
-            mapRef.current.flyTo({
-              center: [
-                importedMarkers[0].lon,
-                importedMarkers[0].lat
-              ],
-              zoom:8
-            });
-          }
-          else if (
-            importedMarkers.length > 1 && 
-            mapRef.current
-          ) {
-            const bounds = 
-              new maplibregl.LngLatBounds();
-
-            importedMarkers.forEach((marker) => {
-              bounds.extend([
-                marker.lon,
-                marker.lat
-              ])
-            })
-          }
-
-          mapRef.current?.fitBounds(
-            bounds,
-            {
-              padding: 50
-            }
-        );
-        },
+        mapRef.current.fitBounds(bounds, { padding: 500 });
+      }
+      }
     });
   }
   
-
   function clearMarkers() {
     setMarkers([]);
     cancelEditingMarker();
@@ -645,8 +582,6 @@ function App() {
         <button className="secondary-button" onClick={clearMarkers}>
           Clear all markers
         </button>
-
-        <h3>Markers by category</h3>
 
         <div
           className="section-header"
