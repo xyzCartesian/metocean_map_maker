@@ -25,6 +25,7 @@ import MarkerStylesPanel from "./components/MarkerStylesPanel";
 import MarkerLabelsPanel from "./components/MarkerLabelsPanel";
 
 import MarkersByCategoryPanel from "./components/MarkersByCategoryPanel";
+import MarkerVisibilityPanel from "./components/MarkerVisibilityPanel";
 
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -477,22 +478,12 @@ function App() {
         </div>
 
         {panelSections["markerVisibility"] && (
-          <>
-          {markerCategories.map((category) => (
-            <label key={category} className="category-toggle">
-              <input
-                type="checkbox"
-                checked={visibleCategories[category]}
-                onChange={() => toggleCategory(category)}
-              />
-              <span
-                className="category-dot"
-                style={{ backgroundColor: markerStyles[category].colour }}
-              />
-              {category}
-            </label>
-          ))}
-          </>
+          <MarkerVisibilityPanel
+            markerCategories={markerCategories}
+            visibleCategories={visibleCategories}
+            markerStyles={markerStyles}
+            toggleCategory={toggleCategory}
+          />
         )}
 
         <div
