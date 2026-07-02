@@ -27,6 +27,8 @@ import MarkerLabelsPanel from "./components/MarkerLabelsPanel";
 import MarkersByCategoryPanel from "./components/MarkersByCategoryPanel";
 import MarkerVisibilityPanel from "./components/MarkerVisibilityPanel";
 
+import MarkerForm from "./components/MarkerForm";
+
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjectsRef = useRef<maplibregl.Marker[]>([]);
@@ -43,7 +45,7 @@ function App() {
   const [pointLat, setPointLat] = useState("");
   const [pointLon, setPointLon] = useState("");
 
-  const [pointLabel] = useState("New point");
+  const [pointLabel, setPointLabel] = useState("");
 
   const [showMarkerLabels, setShowMarkerLabels] = useState(true);
   const [labelFontSize, setLabelFontSize] = useState(12);
@@ -127,7 +129,10 @@ function App() {
       const newMarker: MarkerData = {
         id: Date.now(),
         name: pointNameRef.current || "New point",
-        label: pointLabelRef.current || pointNameRef.current || "New point",
+        label: getMarkerLabel(
+          pointNameRef.current,
+          pointLabelRef.current
+        ),
         lon: event.lngLat.lng,
         lat: event.lngLat.lat,
         category: selectedCategoryRef.current,
@@ -135,9 +140,10 @@ function App() {
 
       setMarkers((previousMarkers) => [...previousMarkers, newMarker]);
       setAddingPoint(false);
+      setPointLabel("");
     });
 
-    return () => {
+  return () => {
       map.remove();
     };
   }, []);
@@ -219,13 +225,14 @@ function App() {
     const newMarker: MarkerData = {
       id: Date.now(),
       name: pointName || "New point",
-      label: pointLabel || pointName || "New point",
+      label: getMarkerLabel(pointName, pointLabel),
       lat,
       lon,
       category: selectedCategory,
     };
 
     setMarkers((previousMarkers) => [...previousMarkers, newMarker]);
+
 
     if (mapRef.current) {
       mapRef.current.flyTo({
@@ -236,7 +243,13 @@ function App() {
 
     setPointLat("");
     setPointLon("");
+    setPointLabel("");
   }
+
+  function getMarkerLabel(name: string, label: string) {
+    return label.trim() ? label : name || "New point";
+  }
+
 
   function toggleCategory(category: MarkerCategory) {
     setVisibleCategories((previous) => ({
@@ -293,7 +306,7 @@ function App() {
               lat,
               lon,
               category: editCategory,
-              label: editLabel || editName || "Unnamed point",
+              label: getMarkerLabel(editName || "Unnamed point", editLabel),
             }
           : marker
       )
@@ -423,65 +436,38 @@ function App() {
           />
         )}
 
-        <div
-          className="section-header"
-          onClick={() => toggleSection("pointDetails")}
-        >
-          {panelSections["pointDetails"]
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Point details
+        <h3>Add point</h3>
+
+        <MarkerForm
+          mode="add"
+          markerCategories={markerCategories}
+          name={pointName}
+          setName={setPointName}
+          label={pointLabel}
+          setLabel={setPointLabel}
+          category={selectedCategory}
+          setCategory={setSelectedCategory}
+          lat={pointLat}
+          setLat={setPointLat}
+          lon={pointLon}
+          setLon={setPointLon}
+          showCoordinates
+        />
+
+        <div className="add-point-actions">
+          <button className="primary-button" onClick={addPointFromCoordinates}>
+            Add point from coordinates
+          </button>
+
+          <button
+            className={
+              addingPoint ? "primary-button active-button" : "primary-button"
+            }
+            onClick={() => setAddingPoint(true)}
+          >
+            Add point by clicking map
+          </button>
         </div>
-
-        {panelSections["pointDetails"] && (
-          <>
-          <label>
-            Name
-            <input
-              className="text-input"
-              value={pointName}
-              onChange={(event) => setPointName(event.target.value)}
-              placeholder="e.g. Bonga buoy"
-            />
-          </label>
-
-          <label>
-            Map label 
-            <input
-              className="text-input"
-              value={editLabel}
-              onChange={(event) => setEditLabel(event.target.value)}
-            /> 
-          </label>
-
-          <label>
-            Category
-            <select
-              className="text-input"
-              value={selectedCategory}
-              onChange={(event) =>
-                setSelectedCategory(event.target.value as MarkerCategory)
-              }
-            >
-              {markerCategories.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
-          </label>
-          </>
-        )}
-
-        <h3>Add by map click</h3>
-
-        <button
-          className={
-            addingPoint ? "primary-button active-button" : "primary-button"
-          }
-          onClick={() => setAddingPoint(true)}
-        >
-          Click map to add point
-        </button>
 
         {addingPoint && (
           <p className="instruction-text">
@@ -489,86 +475,26 @@ function App() {
           </p>
         )}
 
-        <h3>Add by WGS84 coordinates</h3>
-
-        <label>
-          Latitude
-          <input
-            className="text-input"
-            value={pointLat}
-            onChange={(event) => setPointLat(event.target.value)}
-            placeholder="e.g. 4.321"
-          />
-        </label>
-
-        <label>
-          Longitude
-          <input
-            className="text-input"
-            value={pointLon}
-            onChange={(event) => setPointLon(event.target.value)}
-            placeholder="e.g. 6.210"
-          />
-        </label>
-
-        <button className="primary-button" onClick={addPointFromCoordinates}>
-          Add coordinate point
-        </button>
-
         {editingMarkerId !== null && (
-          <>
-            <h3>Edit selected marker</h3>
-
-            <label>
-              Name
-              <input
-                className="text-input"
-                value={editName}
-                onChange={(event) => setEditName(event.target.value)}
-              />
-            </label>
-
-            <label>
-              Category
-              <select
-                className="text-input"
-                value={editCategory}
-                onChange={(event) =>
-                  setEditCategory(event.target.value as MarkerCategory)
-                }
-              >
-                {markerCategories.map((category) => (
-                  <option key={category}>{category}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Latitude
-              <input
-                className="text-input"
-                value={editLat}
-                onChange={(event) => setEditLat(event.target.value)}
-              />
-            </label>
-
-            <label>
-              Longitude
-              <input
-                className="text-input"
-                value={editLon}
-                onChange={(event) => setEditLon(event.target.value)}
-              />
-            </label>
-
-            <button className="primary-button" onClick={saveEditedMarker}>
-              Save changes
-            </button>
-
-            <button className="secondary-button" onClick={cancelEditingMarker}>
-              Cancel edit
-            </button>
-          </>
+         <MarkerForm
+          mode="edit"
+          markerCategories={markerCategories}
+          name={editName}
+          setName={setEditName}
+          label={editLabel}
+          setLabel={setEditLabel}
+          category={editCategory}
+          setCategory={setEditCategory}
+          lat={editLat}
+          setLat={setEditLat}
+          lon={editLon}
+          setLon={setEditLon}
+          onSubmit={saveEditedMarker}
+          onCancel={cancelEditingMarker}
+          submitLabel="Save changes"
+          cancelLabel="Cancel edit"
+          showCoordinates
+        />
         )}
 
         <h3>Import CSV</h3>
@@ -578,11 +504,9 @@ function App() {
           accept=".csv"
           onChange={handleCsvImport}  
         />
-       
-        <button className="secondary-button" onClick={clearMarkers}>
-          Clear all markers
-        </button>
-
+               
+               
+       <h3>Point controls</h3>      
         <div
           className="section-header"
           onClick={() => toggleSection("markersByCategory")}
@@ -644,6 +568,11 @@ function App() {
         />
         )}
 
+        <h3>Clear points</h3>
+
+        <button className="secondary-button" onClick={clearMarkers}>
+          Clear all markers
+        </button>
         </div>
 
 
