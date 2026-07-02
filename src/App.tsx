@@ -8,81 +8,18 @@ import {
   ChevronRight,
 } from "lucide-react"
 
-type MarkerCategory =
-  | "Offshore structure"
-  | "Measured wind"
-  | "Measured wave"
-  | "Measured current"
-  | "Measured combination"
-  | "Model wind"
-  | "Model wave"
-  | "Model current"
-  | "Model combination";
+import type { MarkerCategory } from "./types/MarkerCategory";
+import type { MarkerData } from "./types/MarkerData";
+import type { MarkerStyle } from "./types/MarkerStyle";
 
-type MarkerData = {
-  id: number;
-  name: string;
-  label: string;
-  lat: number;
-  lon: number;
-  category: MarkerCategory;
-};
+import { markerCategories } 
+from "./data/markerCategories";
 
-type MarkerStyle = {
-  colour: string;
-  size: number;
-};
+import { defaultMarkerStyles } 
+from "./data/defaultMarkerStyles";
 
-const markerCategories: MarkerCategory[] = [
-  "Offshore structure",
-  "Measured wind",
-  "Measured wave",
-  "Measured current",
-  "Measured combination",
-  "Model wind",
-  "Model wave",
-  "Model current",
-  "Model combination",
-];
-
-const defaultMarkerStyles: Record<MarkerCategory, MarkerStyle> = {
-  "Offshore structure": {
-    colour: "#d7191c",
-    size: 18,
-  },
-  "Measured wind": {
-    colour: "#2c7bb6",
-    size: 16,
-  },
-  "Measured wave": {
-    colour: "#00a6ca",
-    size: 16,
-  },
-  "Measured current": {
-    colour: "#00ccbc",
-    size: 16,
-  },
-  "Measured combination": {
-    colour: "#90eb9d",
-    size: 16,
-  },
-  "Model wind": {
-    colour: "#fdae61",
-    size: 14,
-  },
-  "Model wave": {
-    colour: "#f46d43",
-    size: 14,
-  },
-  "Model current": {
-    colour: "#abdda4",
-    size: 14,
-  },
-  "Model combination": {
-    colour: "#ffffbf",
-    size: 14,
-  },
-};
+import HelpPanel 
+from "./components/HelpPanel";
 
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -880,89 +817,9 @@ function App() {
         </div>
 
       
-      <div className={helpPanelOpen ? "help-panel open" : "help-panel collapsed"}>
-
-        <button
-          className="help-panel-toggle"
-          onClick={() => setHelpPanelOpen(!helpPanelOpen)}
-        >
-          {helpPanelOpen ? "×" : "? Help"}
-        </button>
-
-        {helpPanelOpen && (
-          <div className="help-panel-content">
-
-            <h3>Help & Examples</h3>
-
-            <p className="help-text">
-              CSV files must contain the following columns:
-            </p>
-
-            <code>
-              Name,Label,Latitude,Longitude,Category
-            </code>
-
-            <p className="help-text">
-              Latitude and longitude should be in WGS84 decimal degrees.
-            </p>
-
-            <p className="help-text">
-              Label is optional. If not provided, the Name will be used as the label.
-            </p>
-
-            <hr />
-
-            <h4>Example Files</h4>
-
-            <div className="example-links">
-              <a
-                href="/examples/Example_Measured_Data.csv"
-                download
-              >
-                Measured Data CSV
-              </a>
-            </div>
-
-          </div>
-        )}
-
-      </div>
+      <HelpPanel />
     </>
   );
-}
-
-function getMarkerColour(category: MarkerCategory) {
-  switch (category) {
-    case "Offshore structure":
-      return "#d7191c";
-
-    case "Measured wind":
-      return "#2c7bb6";
-
-    case "Measured wave":
-      return "#00a6ca";
-
-    case "Measured current":
-      return "#00ccbc";
-
-    case "Measured combination":
-      return "#90eb9d";
-
-    case "Model wind":
-      return "#fdae61";
-
-    case "Model wave":
-      return "#f46d43";
-
-    case "Model current":
-      return "#abdda4";
-
-    case "Model combination":
-      return "#ffffbf";
-
-    default:
-      return "#333333";
-  }
 }
 
 export default App;
