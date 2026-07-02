@@ -166,9 +166,7 @@ function App() {
 
       const markerDot = document.createElement("div");
       markerDot.className = "metocean-marker-dot";
-      markerDot.style.backgroundColor = markerStyle.colour;
-      markerDot.style.width = `${markerStyle.size}px`;
-      markerDot.style.height = `${markerStyle.size}px`;
+      Object.assign(markerDot.style, getMarkerDotStyles(markerStyle));
 
       markerElement.appendChild(markerDot);
 
@@ -249,6 +247,59 @@ function App() {
   function getMarkerLabel(name: string, label: string) {
     return label.trim() ? label : name || "New point";
   }
+
+  function getMarkerDotStyles(markerStyle: MarkerStyle) {
+    const size = markerStyle.size
+
+    const baseStyles = {
+      backgroundColor: markerStyle.colour,
+      width: `${size}px`,
+      height: `${size}px`,
+      borderRadius: "50%",
+    };
+
+    switch (markerStyle.symbol) {
+      case "square":
+        return { ...baseStyles, borderRadius: "0%" };
+
+        case "triangle":
+          return {
+            ...baseStyles,
+            backgroundColour: "transparent",
+            width: 0,
+            height: 0,
+            borderLeft: `${size / 2}px solid transparent`,
+            borderRight: `${size / 2}px solid transparent`,
+            borderBottom: `${size}px solid ${markerStyle.colour}`,
+            borderRadius: "0%",
+          }
+
+        case "diamond":
+          return {
+            ...baseStyles,
+            borderRadius: "0%",
+            transform: "rotate(45deg)",
+          };
+
+        case "star":
+          return {
+            ...baseStyles,
+            backgroundColor: markerStyle.colour,
+            clipPath:
+              "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+          };
+
+        case "cross":
+          return {
+            ...baseStyles,
+            borderRadius: "0%",
+            transform: "rotate(45deg)",
+          };
+
+        default:
+          return baseStyles;
+    }
+      }
 
 
   function toggleCategory(category: MarkerCategory) {

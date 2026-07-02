@@ -61,6 +61,26 @@ function MarkerStylesPanel({ markerCategories, markerStyles, setMarkerStyles }: 
                     }
                 />
                 </label>
+
+                <select
+                    value={markerStyles[category].symbol}
+                    onChange={(event) =>
+                        setMarkerStyles((previous) => ({
+                        ...previous,
+                        [category]: {
+                            ...previous[category],
+                            symbol: event.target.value as MarkerStyle["symbol"],
+                        },
+                        }))
+                    }
+                    >
+                    <option value="circle">Circle</option>
+                    <option value="square">Square</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="diamond">Diamond</option>
+                    <option value="star">Star</option>
+                    <option value="cross">Cross</option>
+                </select>
             </div>
             ))}
         </>
