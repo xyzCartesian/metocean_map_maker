@@ -18,11 +18,11 @@ from "./data/markerCategories";
 import { defaultMarkerStyles } 
 from "./data/defaultMarkerStyles";
 
-import HelpPanel 
-from "./components/HelpPanel";
+import HelpPanel from "./components/HelpPanel";
 
-import MarkerStylesPanel
-from "./components/MarkerStylesPanel";
+import MarkerStylesPanel from "./components/MarkerStylesPanel";
+
+import MarkerLabelsPanel from "./components/MarkerLabelsPanel";
 
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -735,28 +735,12 @@ function App() {
         </div> 
 
         {panelSections["markerLabels"] && (
-          <>
-          <label>
-            <input
-              type="checkbox"
-              checked={showMarkerLabels}
-              onChange={(event) => setShowMarkerLabels(event.target.checked)}
-            />
-            Show labels
-          </label>
-
-          <label>
-            Label font size: {labelFontSize}px
-            <input
-              className="range-input"
-              type="range"
-              min="8"
-              max="24"
-              value={labelFontSize}
-              onChange={(event) => setLabelFontSize(Number(event.target.value))}
-            />    
-          </label>
-          </>
+       <MarkerLabelsPanel
+          showMarkerLabels={showMarkerLabels}
+          setShowMarkerLabels={setShowMarkerLabels}
+          labelFontSize={labelFontSize}
+          setLabelFontSize={setLabelFontSize}
+        />
         )}
 
         <div
@@ -771,55 +755,12 @@ function App() {
         </div> 
 
         {panelSections["markerStyles"] && (
-          <>
-          {markerCategories.map((category) => (
-            <div key={category} className="marker-style-row">
-              <div className = "marker-style-heading">
-                <span
-                  className="category-dot"
-                  style = {{ backgroundColor: markerStyles[category].colour }}
-                />
-                <strong>{category}</strong>
-              </div>
-              <label>
-                Colour
-                <input
-                  className="colour-input"
-                  type="color"
-                  value={markerStyles[category].colour}
-                  onChange={(event) => 
-                    setMarkerStyles((previous) => ({
-                      ...previous,
-                      [category]: { ...previous[category], colour: event.target.value },
-                    }))
-                  }
-                />
-              </label>
-
-              <label>
-                Size: {markerStyles[category].size}px
-                <input
-                  className="range-input"
-                  type="range"
-                  min="8"
-                  max="36"
-                  value={markerStyles[category].size}
-                  onChange={(event) => 
-                    setMarkerStyles((previous) => ({
-                      ...previous,
-                      [category]: { ...previous[category], size: Number(event.target.value) },
-                    }))
-                  }
-                />
-              </label>
-            </div>
-          ))}
-          </>
-        )}
-
         <MarkerStylesPanel
-          {...({ markerCategories, markerStyles, setMarkerStyles } as any)}
+          markerCategories={markerCategories}
+          markerStyles={markerStyles}
+          setMarkerStyles={setMarkerStyles}
         />
+        )}
 
         </div>
 
