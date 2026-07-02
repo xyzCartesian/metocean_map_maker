@@ -21,6 +21,9 @@ from "./data/defaultMarkerStyles";
 import HelpPanel 
 from "./components/HelpPanel";
 
+import MarkerStylesPanel
+from "./components/MarkerStylesPanel";
+
 function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjectsRef = useRef<maplibregl.Marker[]>([]);
@@ -29,7 +32,6 @@ function App() {
   const selectedCategoryRef = useRef<MarkerCategory>("Offshore structure");
   const pointNameRef = useRef("New point");
   const pointLabelRef = useRef("New point");
-  const [helpPanelOpen, setHelpPanelOpen] = useState(false);
 
   const [addingPoint, setAddingPoint] = useState(false);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
@@ -814,9 +816,14 @@ function App() {
           ))}
           </>
         )}
+
+        <MarkerStylesPanel
+          {...({ markerCategories, markerStyles, setMarkerStyles } as any)}
+        />
+
         </div>
 
-      
+
       <HelpPanel />
     </>
   );
