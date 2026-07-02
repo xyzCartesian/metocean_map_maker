@@ -30,6 +30,9 @@ import MarkerVisibilityPanel from "./components/MarkerVisibilityPanel";
 import MarkerForm from "./components/MarkerForm";
 
 function App() {
+  const [mapReady, setMapReady] = useState(false);
+  const currentBasemapRef = useRef<"openstreetmap" | "topographic" | "satellite" | null>(null);
+
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjectsRef = useRef<maplibregl.Marker[]>([]);
 
@@ -87,6 +90,10 @@ function App() {
     markerStyles: false,
   });
 
+  const [basemap, setBasemap] = useState<"openstreetmap" | "topographic" | "satellite">("openstreetmap");
+  const [bathymetryMode, setBathymetryMode] = useState<"none" | "visible">("none");
+  const [topographyMode, setTopographyMode] = useState<"none" | "visible">("none");
+
   useEffect(() => {
     addingPointRef.current = addingPoint;
   }, [addingPoint]);
@@ -106,7 +113,11 @@ function App() {
   useEffect(() => {
     const map = new maplibregl.Map({
       container: "map",
-      style: "https://demotiles.maplibre.org/style.json",
+      style: {
+        version: 8,
+        sources: {},
+        layers: [],
+      },
       center: [0, 0],
       zoom: 2,
     });
@@ -114,14 +125,13 @@ function App() {
     mapRef.current = map;
 
     map.addControl(new maplibregl.NavigationControl(), "top-right");
-
     map.addControl(
-      new maplibregl.ScaleControl({
-        maxWidth: 150,
-        unit: "metric",
-      }),
-      "bottom-left"
+      new maplibregl.ScaleControl({ maxWidth: 150, unit: "metric" }),
+      "bottom-right"
     );
+
+    const onLoad = () => setMapReady(true);
+    map.on("load", onLoad);
 
     map.on("click", (event) => {
       if (!addingPointRef.current) return;
@@ -129,10 +139,7 @@ function App() {
       const newMarker: MarkerData = {
         id: Date.now(),
         name: pointNameRef.current || "New point",
-        label: getMarkerLabel(
-          pointNameRef.current,
-          pointLabelRef.current
-        ),
+        label: getMarkerLabel(pointNameRef.current, pointLabelRef.current),
         lon: event.lngLat.lng,
         lat: event.lngLat.lat,
         category: selectedCategoryRef.current,
@@ -143,10 +150,24 @@ function App() {
       setPointLabel("");
     });
 
-  return () => {
-      map.remove();
-    };
-  }, []);
+    return () => {
+        map.off("load", onLoad);
+        map.remove();
+        mapRef.current = null;
+        setMapReady(false);
+        currentBasemapRef.current = null;
+      };
+    }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (mapRef.current.isStyleLoaded()) {
+      applyBasemap(basemap);
+    } else {
+      mapRef.current.once("load", () => applyBasemap(basemap));
+    }
+  }, [basemap]);
 
   useEffect(() => {
     markerObjectsRef.current.forEach((marker) => marker.remove());
@@ -429,6 +450,44 @@ function App() {
     }));
   }
   
+  function applyBasemap(style: "openstreetmap" | "topographic" | "satellite") {
+    if (!mapRef.current) return;
+
+    if (mapRef.current.getLayer("basemap-layer")) {
+      mapRef.current.removeLayer("basemap-layer");
+    }
+
+    if (mapRef.current.getSource("basemap-source")) {
+      mapRef.current.removeSource("basemap-source");
+    }
+
+    const tiles =
+      style === "satellite"
+        ? [
+            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          ]
+        : style === "topographic"
+        ? [
+            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+          ]
+        : [
+            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+          ];
+
+    mapRef.current.addSource("basemap-source", {
+      type: "raster",
+      tiles,
+      tileSize: 256,
+      attribution: "Tiles © Esri",
+    });
+
+    mapRef.current.addLayer({
+      id: "basemap-layer",
+      type: "raster",
+      source: "basemap-source",
+      layout: { visibility: "visible" },
+    });
+  }
 
   return (
     <>
@@ -448,24 +507,48 @@ function App() {
           Map layers
         </div>
 
-        {panelSections.mapLayers && (
-          <>
         <label>
-          <input type="checkbox" defaultChecked />
           Basemap
+          <select
+            className="text-input"
+            value={basemap}
+            onChange={(event) =>
+              setBasemap(event.target.value as "openstreetmap" | "topographic" | "satellite")
+            }
+          >
+            <option value="openstreetmap">OpenStreetMap</option>
+            <option value="topographic">Topographic</option>
+            <option value="satellite">Satellite</option>
+          </select>
         </label>
 
         <label>
-          <input type="checkbox" />
           Bathymetry
+          <select
+            className="text-input"
+            value={bathymetryMode}
+            onChange={(event) =>
+              setBathymetryMode(event.target.value as "none" | "visible")
+            }
+          >
+            <option value="none">None</option>
+            <option value="visible">Visible</option>
+          </select>
         </label>
 
         <label>
-          <input type="checkbox" />
           Topography
+          <select
+            className="text-input"
+            value={topographyMode}
+            onChange={(event) =>
+              setTopographyMode(event.target.value as "none" | "visible")
+            }
+          >
+            <option value="none">None</option>
+            <option value="visible">Visible</option>
+          </select>
         </label>
-        </>
-        )}
 
         <div
           className="section-header"
