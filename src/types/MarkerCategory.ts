@@ -1,0 +1,10 @@
+export type MarkerCategory = 
+| "Offshore structure"
+| "Measured wind"
+| "Measured wave"
+| "Measured current"
+| "Measured combination"
+| "Model wind"
+| "Model wave"
+| "Model current"
+| "Model combination"
