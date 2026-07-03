@@ -29,6 +29,11 @@ import MarkerVisibilityPanel from "./components/MarkerVisibilityPanel";
 
 import MarkerForm from "./components/MarkerForm";
 
+const BATHYMETRY_COLOUR_SOURCE_ID = "bathymetry-colour-source";
+const BATHYMETRY_COLOUR_LAYER_ID = "bathymetry-colour-layer";
+const BATHYMETRY_CONTOUR_SOURCE_ID = "bathymetry-contour-source";
+const BATHYMETRY_CONTOUR_LAYER_ID = "bathymetry-contour-layer";
+
 function App() {
   const [mapReady, setMapReady] = useState(false);
   const currentBasemapRef = useRef<"openstreetmap" | "topographic" | "satellite" | null>(null);
@@ -91,7 +96,7 @@ function App() {
   });
 
   const [basemap, setBasemap] = useState<"openstreetmap" | "topographic" | "satellite">("openstreetmap");
-  const [bathymetryMode, setBathymetryMode] = useState<"none" | "visible">("none");
+  const [bathymetryMode, setBathymetryMode] = useState<"none" | "colourmap" | "contours" | "colourmap+contours">("none");
   const [topographyMode, setTopographyMode] = useState<"none" | "visible">("none");
 
   useEffect(() => {
@@ -160,14 +165,17 @@ function App() {
     }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !mapReady) return;
 
-    if (mapRef.current.isStyleLoaded()) {
-      applyBasemap(basemap);
-    } else {
-      mapRef.current.once("load", () => applyBasemap(basemap));
-    }
-  }, [basemap]);
+    applyBasemap(basemap);
+    applyBathymetry(bathymetryMode);
+  }, [basemap, mapReady]);
+
+  useEffect(() => {
+    if (!mapRef.current || !mapReady) return;
+
+    applyBathymetry(bathymetryMode);
+  }, [bathymetryMode, mapReady]);
 
   useEffect(() => {
     markerObjectsRef.current.forEach((marker) => marker.remove());
@@ -220,6 +228,7 @@ function App() {
       markerObjectsRef.current.push(marker);
     });
   }, [markers, visibleCategories, showMarkerLabels, labelFontSize, markerStyles]);
+
 
 
   function addPointFromCoordinates() {
@@ -450,6 +459,88 @@ function App() {
     }));
   }
   
+  function removeBathymetryLayers() {
+  if (!mapRef.current) return;
+
+  if (mapRef.current.getLayer(BATHYMETRY_CONTOUR_LAYER_ID)) {
+    mapRef.current.removeLayer(BATHYMETRY_CONTOUR_LAYER_ID);
+  }
+
+  if (mapRef.current.getSource(BATHYMETRY_CONTOUR_SOURCE_ID)) {
+    mapRef.current.removeSource(BATHYMETRY_CONTOUR_SOURCE_ID);
+  }
+
+  if (mapRef.current.getLayer(BATHYMETRY_COLOUR_LAYER_ID)) {
+    mapRef.current.removeLayer(BATHYMETRY_COLOUR_LAYER_ID);
+  }
+
+  if (mapRef.current.getSource(BATHYMETRY_COLOUR_SOURCE_ID)) {
+    mapRef.current.removeSource(BATHYMETRY_COLOUR_SOURCE_ID);
+  }
+}
+
+function addBathymetryColourmap() {
+  if (!mapRef.current) return;
+
+  mapRef.current.addSource(BATHYMETRY_COLOUR_SOURCE_ID, {
+    type: "raster",
+    tiles: ["/tiles/gebco-colour/{z}/{x}/{y}.png"],
+    tileSize: 256,
+    minzoom: 0,
+    bounds: [15, -45, 30, -30],
+    attribution: "Bathymetry © GEBCO",
+  });
+
+  mapRef.current.addLayer({
+    id: BATHYMETRY_COLOUR_LAYER_ID,
+    type: "raster",
+    source: BATHYMETRY_COLOUR_SOURCE_ID,
+    paint: {
+      "raster-opacity": 0.6,
+    },
+  });
+}
+
+function addBathymetryContours() {
+  if (!mapRef.current) return;
+
+  mapRef.current.addSource(BATHYMETRY_CONTOUR_SOURCE_ID, {
+    type: "vector",
+    tiles: ["http://localhost:8080/data/gebco-contours/{z}/{x}/{y}.pbf"],
+    attribution: "Contours © GEBCO",
+  });
+
+  mapRef.current.addLayer({
+    id: BATHYMETRY_CONTOUR_LAYER_ID,
+    type: "line",
+    source: BATHYMETRY_CONTOUR_SOURCE_ID,
+    "source-layer": "contours",
+    paint: {
+      "line-color": "#08306b",
+      "line-width": 1,
+      "line-opacity": 0.7,
+    },
+  });
+}
+
+  function applyBathymetry(
+    mode: "none" | "colourmap" | "contours" | "colourmap+contours"
+  ) {
+    if (!mapRef.current) return;
+
+    removeBathymetryLayers();
+
+    if (mode === "none") return;
+
+    if (mode === "colourmap" || mode === "colourmap+contours") {
+      addBathymetryColourmap();
+    }
+
+    if (mode === "contours" || mode === "colourmap+contours") {
+      addBathymetryContours();
+    }
+  }
+
   function applyBasemap(style: "openstreetmap" | "topographic" | "satellite") {
     if (!mapRef.current) return;
 
@@ -523,18 +614,26 @@ function App() {
         </label>
 
         <label>
-          Bathymetry
+        Bathymetry
           <select
             className="text-input"
             value={bathymetryMode}
             onChange={(event) =>
-              setBathymetryMode(event.target.value as "none" | "visible")
+              setBathymetryMode(
+                event.target.value as
+                  | "none"
+                  | "colourmap"
+                  | "contours"
+                  | "colourmap+contours"
+              )
             }
           >
             <option value="none">None</option>
-            <option value="visible">Visible</option>
+            <option value="colourmap">Colourmap</option>
+            <option value="contours">Contours</option>
+            <option value="colourmap+contours">Colourmap + contours</option>
           </select>
-        </label>
+      </label>
 
         <label>
           Topography
@@ -629,7 +728,7 @@ function App() {
           cancelLabel="Cancel edit"
           showCoordinates
         />
-        )}
+      )}
 
         <h3>Import CSV</h3>
           
