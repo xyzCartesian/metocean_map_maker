@@ -487,6 +487,7 @@ function addBathymetryColourmap() {
     tiles: ["/tiles/gebco-colour/{z}/{x}/{y}.png"],
     tileSize: 256,
     minzoom: 0,
+    maxzoom: 10,
     bounds: [15, -45, 30, -30],
     attribution: "Bathymetry © GEBCO",
   });
@@ -766,7 +767,7 @@ function addBathymetryContours() {
           className="section-header"
           onClick={() => toggleSection("markerLabels") }
         >
-          {panelSections["markersByCategory"]
+          {panelSections["markerLabels"]
             ? <ChevronDown size={16} />
             : <ChevronRight size={16} />
           }
@@ -786,7 +787,7 @@ function addBathymetryContours() {
           className="section-header"
           onClick={() => toggleSection("markerStyles") }
         >
-          {panelSections["markersByCategory"]
+          {panelSections["markerStyles"]
             ? <ChevronDown size={16} />
             : <ChevronRight size={16} />
           }
