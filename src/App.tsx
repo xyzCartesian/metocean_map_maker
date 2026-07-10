@@ -1,6 +1,6 @@
 import "./App.css";
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import maplibregl, { type FilterSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { importMarkersFromCsv } from "./utils/importMarkersFromCsv";
 import {
@@ -11,6 +11,9 @@ import {
 import type { MarkerCategory } from "./types/MarkerCategory";
 import type { MarkerData } from "./types/MarkerData";
 import type { MarkerStyle } from "./types/MarkerStyle";
+import type {
+  BathymetryContourConfig,
+} from "./types/BathymetryContourConfig";
 
 import { markerCategories } 
 from "./data/markerCategories";
@@ -28,11 +31,59 @@ import MarkersByCategoryPanel from "./components/MarkersByCategoryPanel";
 import MarkerVisibilityPanel from "./components/MarkerVisibilityPanel";
 
 import MarkerForm from "./components/MarkerForm";
+import ContourControlsPanel from "./components/ContourControlsPanel";
 
 const BATHYMETRY_COLOUR_SOURCE_ID = "bathymetry-colour-source";
 const BATHYMETRY_COLOUR_LAYER_ID = "bathymetry-colour-layer";
 const BATHYMETRY_CONTOUR_SOURCE_ID = "bathymetry-contour-source";
 const BATHYMETRY_CONTOUR_LAYER_ID = "bathymetry-contour-layer";
+const BATHYMETRY_CONTOUR_LABEL_LAYER_ID = "bathymetry-contour-label-layer";
+
+function getActiveContourInterval(config: BathymetryContourConfig): number | null {
+  if (config.intervalMode === "all") return null;
+  if (config.intervalMode === "10m") return 10;
+  if (config.intervalMode === "100m") return 100;
+  return Math.max(1, Math.round(config.customInterval));
+}
+
+function getContourFilter(
+  config: BathymetryContourConfig
+): FilterSpecification | undefined {
+  const interval = getActiveContourInterval(config);
+
+  if (!interval) {
+    return undefined;
+  }
+
+  return [
+    "==",
+    ["%", ["abs", ["round", ["get", "depth"]]], interval],
+    0,
+  ] as unknown as FilterSpecification;
+}
+
+function getActiveLabelInterval(config: BathymetryContourConfig): number | null {
+  if (config.labelIntervalMode === "all") return null;
+  if (config.labelIntervalMode === "10m") return 10;
+  if (config.labelIntervalMode === "100m") return 100;
+  return Math.max(1, Math.round(config.customLabelInterval));
+}
+
+function getLabelFilter(
+  config: BathymetryContourConfig
+): FilterSpecification | undefined {
+  const interval = getActiveLabelInterval(config);
+
+  if (!interval) {
+    return undefined;
+  }
+
+  return [
+    "==",
+    ["%", ["abs", ["round", ["get", "depth"]]], interval],
+    0,
+  ] as unknown as FilterSpecification;
+}
 
 function App() {
   const [mapReady, setMapReady] = useState(false);
@@ -93,11 +144,25 @@ function App() {
     markersByCategory: false,
     markerLabels: false,
     markerStyles: false,
+    contourProperties: false,
   });
 
   const [basemap, setBasemap] = useState<"openstreetmap" | "topographic" | "satellite">("openstreetmap");
   const [bathymetryMode, setBathymetryMode] = useState<"none" | "colourmap" | "contours" | "colourmap+contours">("none");
   const [topographyMode, setTopographyMode] = useState<"none" | "visible">("none");
+
+  const [contourConfig, setContourConfig] = useState<BathymetryContourConfig>({
+    intervalMode: "all",
+    customInterval: 50,
+    lineColor: "#08306b",
+    labelColor: "#d5d8dd",
+    lineWidth: 1,
+    labelsEnabled: true,
+    labelFontSize: 11,
+    labelSpacingPx: 100,
+    customLabelInterval: 100,
+    labelIntervalMode: "all",
+  });
 
   useEffect(() => {
     addingPointRef.current = addingPoint;
@@ -156,32 +221,60 @@ function App() {
     });
 
     return () => {
-        map.off("load", onLoad);
-        map.remove();
-        mapRef.current = null;
-        setMapReady(false);
-        currentBasemapRef.current = null;
-      };
-    }, []);
+      map.off("load", onLoad);
+      map.remove();
+      mapRef.current = null;
+      setMapReady(false);
+      currentBasemapRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || !mapReady) return;
 
-    applyBasemap(basemap);
-    applyBathymetry(bathymetryMode);
+    if (mapRef.current.getLayer("basemap-layer")) {
+      mapRef.current.removeLayer("basemap-layer");
+    }
+
+    if (mapRef.current.getSource("basemap-source")) {
+      mapRef.current.removeSource("basemap-source");
+    }
+
+    const tiles =
+      basemap === "satellite"
+        ? [
+            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          ]
+        : basemap === "topographic"
+        ? [
+            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+          ]
+        : [
+            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+          ];
+
+    mapRef.current.addSource("basemap-source", {
+      type: "raster",
+      tiles,
+      tileSize: 256,
+      attribution: "Tiles © Esri",
+    });
+
+    mapRef.current.addLayer({
+      id: "basemap-layer",
+      type: "raster",
+      source: "basemap-source",
+      layout: { visibility: "visible" },
+    });
   }, [basemap, mapReady]);
-
-  useEffect(() => {
-    if (!mapRef.current || !mapReady) return;
-
-    applyBathymetry(bathymetryMode);
-  }, [bathymetryMode, mapReady]);
 
   useEffect(() => {
     markerObjectsRef.current.forEach((marker) => marker.remove());
     markerObjectsRef.current = [];
 
-    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    if (!map) return;
 
     const visibleMarkers = markers.filter(
       (markerData) => visibleCategories[markerData.category]
@@ -208,7 +301,6 @@ function App() {
         markerElement.appendChild(markerLabel);
       }
 
-     
       const marker = new maplibregl.Marker({
         element: markerElement,
         anchor: "center",
@@ -223,13 +315,70 @@ function App() {
             Lon: ${markerData.lon.toFixed(5)}
           `)
         )
-        .addTo(mapRef.current!);
+        .addTo(map);
 
       markerObjectsRef.current.push(marker);
     });
   }, [markers, visibleCategories, showMarkerLabels, labelFontSize, markerStyles]);
 
+  useEffect(() => {
+    if (!mapRef.current || !mapReady) return;
 
+    removeBathymetryLayers();
+
+    if (bathymetryMode === "none") {
+      return;
+    }
+
+    if (bathymetryMode === "colourmap" || bathymetryMode === "colourmap+contours") {
+      addBathymetryColourmap();
+    }
+
+    if (bathymetryMode === "contours" || bathymetryMode === "colourmap+contours") {
+      mapRef.current.addSource(BATHYMETRY_CONTOUR_SOURCE_ID, {
+        type: "vector",
+        tiles: ["http://localhost:8080/data/gebco-contours/{z}/{x}/{y}.pbf"],
+        attribution: "Contours © GEBCO",
+      });
+
+      const contourFilter = getContourFilter(contourConfig);
+      const labelFilter = getLabelFilter(contourConfig);
+
+      mapRef.current.addLayer({
+        id: BATHYMETRY_CONTOUR_LAYER_ID,
+        type: "line",
+        source: BATHYMETRY_CONTOUR_SOURCE_ID,
+        "source-layer": "contours",
+        ...(contourFilter ? { filter: contourFilter } : {}),
+        paint: {
+          "line-color": contourConfig.lineColor,
+          "line-width": contourConfig.lineWidth,
+          "line-opacity": 0.8,
+        },
+      });
+
+      if (contourConfig.labelsEnabled) {
+        mapRef.current.addLayer({
+          id: BATHYMETRY_CONTOUR_LABEL_LAYER_ID,
+          type: "symbol",
+          source: BATHYMETRY_CONTOUR_SOURCE_ID,
+          "source-layer": "contours",
+          ...(labelFilter ? { filter: labelFilter } : {}),
+          layout: {
+            "symbol-placement": "line",
+            "symbol-spacing": contourConfig.labelSpacingPx,
+            "text-field": ["concat", ["to-string", ["get", "depth"]], " m"],
+            "text-size": contourConfig.labelFontSize,
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+          },
+          paint: {
+            "text-color": contourConfig.labelColor,
+          },
+        });
+      }
+    }
+  }, [bathymetryMode, contourConfig, mapReady]);
 
   function addPointFromCoordinates() {
     const lat = Number(pointLat);
@@ -459,19 +608,23 @@ function App() {
     }));
   }
   
-  function removeBathymetryLayers() {
+function removeBathymetryLayers() {
   if (!mapRef.current) return;
+
+  if (mapRef.current.getLayer(BATHYMETRY_CONTOUR_LABEL_LAYER_ID)) {
+    mapRef.current.removeLayer(BATHYMETRY_CONTOUR_LABEL_LAYER_ID);
+  }
 
   if (mapRef.current.getLayer(BATHYMETRY_CONTOUR_LAYER_ID)) {
     mapRef.current.removeLayer(BATHYMETRY_CONTOUR_LAYER_ID);
   }
 
-  if (mapRef.current.getSource(BATHYMETRY_CONTOUR_SOURCE_ID)) {
-    mapRef.current.removeSource(BATHYMETRY_CONTOUR_SOURCE_ID);
-  }
-
   if (mapRef.current.getLayer(BATHYMETRY_COLOUR_LAYER_ID)) {
     mapRef.current.removeLayer(BATHYMETRY_COLOUR_LAYER_ID);
+  }
+
+  if (mapRef.current.getSource(BATHYMETRY_CONTOUR_SOURCE_ID)) {
+    mapRef.current.removeSource(BATHYMETRY_CONTOUR_SOURCE_ID);
   }
 
   if (mapRef.current.getSource(BATHYMETRY_COLOUR_SOURCE_ID)) {
@@ -502,84 +655,6 @@ function addBathymetryColourmap() {
   });
 }
 
-function addBathymetryContours() {
-  if (!mapRef.current) return;
-
-  mapRef.current.addSource(BATHYMETRY_CONTOUR_SOURCE_ID, {
-    type: "vector",
-    tiles: ["http://localhost:8080/data/gebco-contours/{z}/{x}/{y}.pbf"],
-    attribution: "Contours © GEBCO",
-  });
-
-  mapRef.current.addLayer({
-    id: BATHYMETRY_CONTOUR_LAYER_ID,
-    type: "line",
-    source: BATHYMETRY_CONTOUR_SOURCE_ID,
-    "source-layer": "contours",
-    paint: {
-      "line-color": "#08306b",
-      "line-width": 1,
-      "line-opacity": 0.7,
-    },
-  });
-}
-
-  function applyBathymetry(
-    mode: "none" | "colourmap" | "contours" | "colourmap+contours"
-  ) {
-    if (!mapRef.current) return;
-
-    removeBathymetryLayers();
-
-    if (mode === "none") return;
-
-    if (mode === "colourmap" || mode === "colourmap+contours") {
-      addBathymetryColourmap();
-    }
-
-    if (mode === "contours" || mode === "colourmap+contours") {
-      addBathymetryContours();
-    }
-  }
-
-  function applyBasemap(style: "openstreetmap" | "topographic" | "satellite") {
-    if (!mapRef.current) return;
-
-    if (mapRef.current.getLayer("basemap-layer")) {
-      mapRef.current.removeLayer("basemap-layer");
-    }
-
-    if (mapRef.current.getSource("basemap-source")) {
-      mapRef.current.removeSource("basemap-source");
-    }
-
-    const tiles =
-      style === "satellite"
-        ? [
-            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-          ]
-        : style === "topographic"
-        ? [
-            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-          ]
-        : [
-            "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-          ];
-
-    mapRef.current.addSource("basemap-source", {
-      type: "raster",
-      tiles,
-      tileSize: 256,
-      attribution: "Tiles © Esri",
-    });
-
-    mapRef.current.addLayer({
-      id: "basemap-layer",
-      type: "raster",
-      source: "basemap-source",
-      layout: { visibility: "visible" },
-    });
-  }
 
   return (
     <>
@@ -800,6 +875,24 @@ function addBathymetryContours() {
           markerStyles={markerStyles}
           setMarkerStyles={setMarkerStyles}
         />
+        )}
+        <h3>Contour controls</h3> 
+        <div
+          className="section-header"
+          onClick={() => toggleSection("contourProperties") }
+        >
+          {panelSections["contourProperties"]
+            ? <ChevronDown size={16} />
+            : <ChevronRight size={16} />
+          }
+          Contour properties
+        </div> 
+
+        {panelSections["contourProperties"] && (
+          <ContourControlsPanel
+            contourConfig={contourConfig}
+            setContourConfig={setContourConfig}
+          />
         )}
 
         <h3>Clear points</h3>

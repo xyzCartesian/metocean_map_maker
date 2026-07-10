@@ -2,16 +2,24 @@ import Papa from "papaparse";
 import type { MarkerCategory } from "../types/MarkerCategory";
 import type { MarkerData } from "../types/MarkerData";
 
+type CsvMarkerRow = {
+    Name?: string;
+    Label?: string;
+    Latitude?: string | number;
+    Longitude?: string | number;
+    Category?: string;
+};
+
 export function importMarkersFromCsv(
     file: File,
     onComplete: (markers: MarkerData[]) => void
 ) {
-    Papa.parse(file, {
+    Papa.parse<CsvMarkerRow>(file, {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
         const importedMarkers = results.data
-            .map((row: any) => {
+            .map((row) => {
             const lat = Number(row.Latitude);
             const lon = Number(row.Longitude);
 
