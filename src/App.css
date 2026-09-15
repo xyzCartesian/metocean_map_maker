@@ -11,6 +11,23 @@ body,
   inset: 0;
 }
 
+.cursor-position-indicator {
+  position: absolute;
+  bottom: 70px;
+  right: 10px;
+  z-index: 1000;
+
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  padding: 3px 8px;
+
+  font-family: monospace;
+  font-size: 11px;
+  color: #333;
+  pointer-events: none;
+}
+
 .control-panel {
   position: absolute;
   top: 15px;

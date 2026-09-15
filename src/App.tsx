@@ -32,6 +32,7 @@ import MarkerVisibilityPanel from "./components/MarkerVisibilityPanel";
 
 import MarkerForm from "./components/MarkerForm";
 import ContourControlsPanel from "./components/ContourControlsPanel";
+import ExportPanel from "./components/ExportPanel";
 
 const BATHYMETRY_COLOUR_SOURCE_ID = "bathymetry-colour-source";
 const BATHYMETRY_COLOUR_LAYER_ID = "bathymetry-colour-layer";
@@ -88,6 +89,7 @@ function getLabelFilter(
 function App() {
   const [mapReady, setMapReady] = useState(false);
   const currentBasemapRef = useRef<"openstreetmap" | "topographic" | "satellite" | null>(null);
+  const [cursorLngLat, setCursorLngLat] = useState<{ lng: number; lat: number } | null>(null);
 
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjectsRef = useRef<maplibregl.Marker[]>([]);
@@ -155,7 +157,7 @@ function App() {
     intervalMode: "all",
     customInterval: 50,
     lineColor: "#08306b",
-    labelColor: "#d5d8dd",
+    labelColor: "#000000",
     lineWidth: 1,
     labelsEnabled: true,
     labelFontSize: 11,
@@ -190,6 +192,8 @@ function App() {
       },
       center: [0, 0],
       zoom: 2,
+      // Required so the canvas can be read back for PNG/PDF/SVG export.
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
 
     mapRef.current = map;
@@ -218,6 +222,14 @@ function App() {
       setMarkers((previousMarkers) => [...previousMarkers, newMarker]);
       setAddingPoint(false);
       setPointLabel("");
+    });
+
+    map.on("mousemove", (event) => {
+      setCursorLngLat({ lng: event.lngLat.lng, lat: event.lngLat.lat });
+    });
+
+    map.on("mouseout", () => {
+      setCursorLngLat(null);
     });
 
     return () => {
@@ -339,6 +351,10 @@ function App() {
         type: "vector",
         tiles: ["http://localhost:8080/data/gebco-contours/{z}/{x}/{y}.pbf"],
         attribution: "Contours © GEBCO",
+        // The tileset itself only goes up to z7; beyond that MapLibre
+        // overzooms the z7 tile instead of requesting non-existent ones.
+        minzoom: 0,
+        maxzoom: 7,
       });
 
       const contourFilter = getContourFilter(contourConfig);
@@ -472,6 +488,8 @@ function App() {
           return {
             ...baseStyles,
             borderRadius: "0%",
+            clipPath:
+              "polygon(35% 0%, 65% 0%, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0% 65%, 0% 35%, 35% 35%)",
             transform: "rotate(45deg)",
           };
 
@@ -659,6 +677,23 @@ function addBathymetryColourmap() {
   return (
     <>
       <div id="map" />
+
+      {cursorLngLat && (
+        <div className="cursor-position-indicator">
+          Lat: {cursorLngLat.lat.toFixed(4)}, Lon: {cursorLngLat.lng.toFixed(4)}
+        </div>
+      )}
+
+      <ExportPanel
+        mapRef={mapRef}
+        mapReady={mapReady}
+        markers={markers}
+        markerStyles={markerStyles}
+        visibleCategories={visibleCategories}
+        showMarkerLabels={showMarkerLabels}
+        labelFontSize={labelFontSize}
+        mapTitle="Metocean Map"
+      />
 
       <div className="control-panel">
         <h2>Metocean Map Maker</h2>
