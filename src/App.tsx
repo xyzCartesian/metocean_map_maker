@@ -2,6 +2,7 @@ import "./App.css";
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type FilterSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Protocol } from "pmtiles";
 import { importMarkersFromCsv } from "./utils/importMarkersFromCsv";
 import {
   ChevronDown,
@@ -44,50 +45,42 @@ const BATHYMETRY_CONTOUR_SOURCE_ID = "bathymetry-contour-source";
 const BATHYMETRY_CONTOUR_LAYER_ID = "bathymetry-contour-layer";
 const BATHYMETRY_CONTOUR_LABEL_LAYER_ID = "bathymetry-contour-label-layer";
 
-function getActiveContourInterval(config: BathymetryContourConfig): number | null {
-  if (config.intervalMode === "all") return null;
-  if (config.intervalMode === "10m") return 10;
-  if (config.intervalMode === "100m") return 100;
-  return Math.max(1, Math.round(config.customInterval));
-}
+// PMTiles protocol must be registered once before any pmtiles:// source is used.
+const pmtilesProtocol = new Protocol();
+maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile);
 
-function getContourFilter(
-  config: BathymetryContourConfig
-): FilterSpecification | undefined {
-  const interval = getActiveContourInterval(config);
-
-  if (!interval) {
-    return undefined;
-  }
-
+// Contours exist at 10m intervals (0 to -100m) and 100m intervals (-100m to -11000m).
+// depth is negative (below sea level), so we use abs() and modulo against the
+// per-zone interval.
+function buildContourFilter(
+  shallowStep: number,
+  deepStep: number
+): FilterSpecification {
+  const shallowInterval = 10 * shallowStep;
+  const deepInterval = 100 * deepStep;
   return [
-    "==",
-    ["%", ["abs", ["round", ["get", "depth"]]], interval],
-    0,
+    "any",
+    // Shallow zone: |depth| <= 100, keep multiples of the shallow interval
+    [
+      "all",
+      ["<=", ["abs", ["get", "depth"]], 100],
+      ["==", ["%", ["abs", ["round", ["get", "depth"]]], shallowInterval], 0],
+    ],
+    // Deep zone: |depth| > 100, keep multiples of the deep interval
+    [
+      "all",
+      [">", ["abs", ["get", "depth"]], 100],
+      ["==", ["%", ["abs", ["round", ["get", "depth"]]], deepInterval], 0],
+    ],
   ] as unknown as FilterSpecification;
 }
 
-function getActiveLabelInterval(config: BathymetryContourConfig): number | null {
-  if (config.labelIntervalMode === "all") return null;
-  if (config.labelIntervalMode === "10m") return 10;
-  if (config.labelIntervalMode === "100m") return 100;
-  return Math.max(1, Math.round(config.customLabelInterval));
-}
-
-function getLabelFilter(
-  config: BathymetryContourConfig
-): FilterSpecification | undefined {
-  const interval = getActiveLabelInterval(config);
-
-  if (!interval) {
-    return undefined;
-  }
-
-  return [
-    "==",
-    ["%", ["abs", ["round", ["get", "depth"]]], interval],
-    0,
-  ] as unknown as FilterSpecification;
+/** Steps used when adaptive zoom is on, per zoom band (shallow, deep). */
+function getAdaptiveSteps(zoom: number): { shallow: number; deep: number } {
+  if (zoom < 3) return { shallow: 100, deep: 20 }; // 1000m / 2000m
+  if (zoom < 5) return { shallow: 50, deep: 10 };  // 500m / 1000m
+  if (zoom < 7) return { shallow: 20, deep: 5 };   // 200m / 500m
+  return { shallow: 10, deep: 2 };                 // 100m / 200m
 }
 
 function App() {
@@ -161,17 +154,19 @@ function App() {
   const [topographyMode, setTopographyMode] = useState<"none" | "visible">("none");
 
   const [contourConfig, setContourConfig] = useState<BathymetryContourConfig>({
-    intervalMode: "all",
-    customInterval: 50,
+    shallowStep: 1,
+    deepStep: 1,
+    showAllContours: false,
+    adaptiveZoom: true,
     lineColor: "#08306b",
     labelColor: "#000000",
     lineWidth: 1,
     labelsEnabled: true,
     labelFontSize: 11,
     labelSpacingPx: 100,
-    customLabelInterval: 100,
-    labelIntervalMode: "all",
   });
+
+  const [mapZoom, setMapZoom] = useState(2);
 
   useEffect(() => {
     addingPointRef.current = addingPoint;
@@ -239,6 +234,10 @@ function App() {
       setCursorLngLat(null);
     });
 
+    map.on("zoom", () => {
+      setMapZoom(map.getZoom());
+    });
+
     return () => {
       map.off("load", onLoad);
       map.remove();
@@ -279,12 +278,23 @@ function App() {
       attribution: "Tiles © Esri",
     });
 
-    mapRef.current.addLayer({
-      id: "basemap-layer",
-      type: "raster",
-      source: "basemap-source",
-      layout: { visibility: "visible" },
-    });
+    // Insert the basemap beneath any existing bathymetry layers so a basemap
+    // switch doesn't paint over contours/colourmap.
+    const firstBathymetryLayer = mapRef.current.getLayer(BATHYMETRY_COLOUR_LAYER_ID)
+      ? BATHYMETRY_COLOUR_LAYER_ID
+      : mapRef.current.getLayer(BATHYMETRY_CONTOUR_LAYER_ID)
+      ? BATHYMETRY_CONTOUR_LAYER_ID
+      : undefined;
+
+    mapRef.current.addLayer(
+      {
+        id: "basemap-layer",
+        type: "raster",
+        source: "basemap-source",
+        layout: { visibility: "visible" },
+      },
+      firstBathymetryLayer
+    );
   }, [basemap, mapReady]);
 
   useEffect(() => {
@@ -356,16 +366,22 @@ function App() {
     if (bathymetryMode === "contours" || bathymetryMode === "colourmap+contours") {
       mapRef.current.addSource(BATHYMETRY_CONTOUR_SOURCE_ID, {
         type: "vector",
-        tiles: ["http://localhost:8080/data/gebco-contours/{z}/{x}/{y}.pbf"],
+        url: "pmtiles:///tiles/gebco-contours.pmtiles",
         attribution: "Contours © GEBCO",
-        // The tileset itself only goes up to z7; beyond that MapLibre
-        // overzooms the z7 tile instead of requesting non-existent ones.
+        // Tileset goes to z9; beyond that MapLibre overzooms the z9 tile
+        // instead of requesting non-existent tiles. Keep this in sync with
+        // the maxzoom of the deployed archive.
         minzoom: 0,
-        maxzoom: 7,
+        maxzoom: 9,
       });
 
-      const contourFilter = getContourFilter(contourConfig);
-      const labelFilter = getLabelFilter(contourConfig);
+      const { shallow, deep } = contourConfig.adaptiveZoom
+        ? getAdaptiveSteps(mapZoom)
+        : { shallow: contourConfig.shallowStep, deep: contourConfig.deepStep };
+
+      const contourFilter = contourConfig.showAllContours
+        ? undefined
+        : buildContourFilter(shallow, deep);
 
       mapRef.current.addLayer({
         id: BATHYMETRY_CONTOUR_LAYER_ID,
@@ -386,7 +402,7 @@ function App() {
           type: "symbol",
           source: BATHYMETRY_CONTOUR_SOURCE_ID,
           "source-layer": "contours",
-          ...(labelFilter ? { filter: labelFilter } : {}),
+          ...(contourFilter ? { filter: contourFilter } : {}),
           layout: {
             "symbol-placement": "line",
             "symbol-spacing": contourConfig.labelSpacingPx,
@@ -401,7 +417,7 @@ function App() {
         });
       }
     }
-  }, [bathymetryMode, contourConfig, mapReady]);
+  }, [bathymetryMode, contourConfig, mapReady, mapZoom]);
 
   function addPointFromCoordinates() {
     const lat = Number(pointLat);
@@ -666,7 +682,6 @@ function addBathymetryColourmap() {
     tileSize: 256,
     minzoom: 0,
     maxzoom: 10,
-    bounds: [15, -45, 30, -30],
     attribution: "Bathymetry © GEBCO",
   });
 

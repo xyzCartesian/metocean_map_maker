@@ -1,53 +1,98 @@
 import React from "react";
-import type {
-  BathymetryContourConfig,
-  ContourIntervalMode,
-  LabelIntervalMode,
-} from "../types/BathymetryContourConfig";
+import type { BathymetryContourConfig } from "../types/BathymetryContourConfig";
 
 type Props = {
   contourConfig: BathymetryContourConfig;
   setContourConfig: React.Dispatch<React.SetStateAction<BathymetryContourConfig>>;
 };
 
+const STEP_LABELS: Record<number, string> = {
+  1: "all",
+  2: "2x",
+  5: "5x",
+  10: "10x",
+  20: "20x",
+  50: "50x",
+  100: "100x",
+};
+
+function stepLabel(step: number, base: number) {
+  const interval = base * step;
+  return interval >= 1000 ? `${interval / 1000} km` : `${interval} m`;
+}
+
 function ContourControlsPanel({ contourConfig, setContourConfig }: Props) {
+  const set = (patch: Partial<BathymetryContourConfig>) =>
+    setContourConfig((previous) => ({ ...previous, ...patch }));
+
   return (
     <>
-      <label>
-        Interval set
-        <select
-          className="text-input"
-          value={contourConfig.intervalMode}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              intervalMode: event.target.value as ContourIntervalMode,
-            }))
-          }
-        >
-          <option value="all">All contours</option>
-          <option value="10m">10 m</option>
-          <option value="100m">100 m</option>
-          <option value="custom">Custom</option>
-        </select>
+      <label className="contour-checkbox">
+        <input
+          type="checkbox"
+          checked={contourConfig.showAllContours}
+          onChange={(event) => set({ showAllContours: event.target.checked })}
+        />
+        Show all contours
       </label>
 
-      {contourConfig.intervalMode === "custom" && (
-        <label>
-          Custom interval (m)
-          <input
-            className="text-input"
-            type="number"
-            min={1}
-            value={contourConfig.customInterval}
-            onChange={(event) =>
-              setContourConfig((previous) => ({
-                ...previous,
-                customInterval: Number(event.target.value) || 1,
-              }))
-            }
-          />
-        </label>
+      <label className="contour-checkbox">
+        <input
+          type="checkbox"
+          checked={contourConfig.adaptiveZoom}
+          disabled={contourConfig.showAllContours}
+          onChange={(event) => set({ adaptiveZoom: event.target.checked })}
+        />
+        Thin contours when zoomed out
+      </label>
+
+      {!contourConfig.showAllContours && (
+        <>
+          <label>
+            Shallow contours (0–100 m): every {stepLabel(contourConfig.shallowStep, 10)}
+            <input
+              className="range-input"
+              type="range"
+              min="1"
+              max="10"
+              step="1"
+              list="shallow-steps"
+              value={Math.min(contourConfig.shallowStep, 10)}
+              onChange={(event) => set({ shallowStep: Number(event.target.value) })}
+            />
+            <datalist id="shallow-steps">
+              {[1, 2, 5, 10].map((v) => (
+                <option key={v} value={v} label={STEP_LABELS[v]} />
+              ))}
+            </datalist>
+          </label>
+
+          <label>
+            Deep contours (&gt;100 m): every {stepLabel(contourConfig.deepStep, 100)}
+            <input
+              className="range-input"
+              type="range"
+              min="1"
+              max="50"
+              step="1"
+              list="deep-steps"
+              value={Math.min(contourConfig.deepStep, 50)}
+              onChange={(event) => set({ deepStep: Number(event.target.value) })}
+            />
+            <datalist id="deep-steps">
+              {[1, 2, 5, 10, 20, 50].map((v) => (
+                <option key={v} value={v} label={STEP_LABELS[v]} />
+              ))}
+            </datalist>
+          </label>
+        </>
+      )}
+
+      {contourConfig.adaptiveZoom && !contourConfig.showAllContours && (
+        <p className="instruction-text">
+          Adaptive zoom active: sliders set the maximum density at close zoom;
+          contours thin automatically as you zoom out.
+        </p>
       )}
 
       <label>
@@ -56,12 +101,7 @@ function ContourControlsPanel({ contourConfig, setContourConfig }: Props) {
           className="colour-input"
           type="color"
           value={contourConfig.lineColor}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              lineColor: event.target.value,
-            }))
-          }
+          onChange={(event) => set({ lineColor: event.target.value })}
         />
       </label>
 
@@ -71,26 +111,28 @@ function ContourControlsPanel({ contourConfig, setContourConfig }: Props) {
           className="colour-input"
           type="color"
           value={contourConfig.labelColor}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              labelColor: event.target.value,
-            }))
-          }
+          onChange={(event) => set({ labelColor: event.target.value })}
         />
       </label>
 
       <label>
-        Labels
+        Line width: {contourConfig.lineWidth}px
+        <input
+          className="range-input"
+          type="range"
+          min="0.5"
+          max="5"
+          step="0.5"
+          value={contourConfig.lineWidth}
+          onChange={(event) => set({ lineWidth: Number(event.target.value) })}
+        />
+      </label>
+
+      <label className="contour-checkbox">
         <input
           type="checkbox"
           checked={contourConfig.labelsEnabled}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              labelsEnabled: event.target.checked,
-            }))
-          }
+          onChange={(event) => set({ labelsEnabled: event.target.checked })}
         />
         Show contour labels
       </label>
@@ -104,12 +146,7 @@ function ContourControlsPanel({ contourConfig, setContourConfig }: Props) {
           max="300"
           step="10"
           value={contourConfig.labelSpacingPx}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              labelSpacingPx: Number(event.target.value),
-            }))
-          }
+          onChange={(event) => set({ labelSpacingPx: Number(event.target.value) })}
         />
       </label>
 
@@ -121,53 +158,12 @@ function ContourControlsPanel({ contourConfig, setContourConfig }: Props) {
           min="8"
           max="30"
           value={contourConfig.labelFontSize}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              labelFontSize: Number(event.target.value),
-            }))
-          }
+          onChange={(event) => set({ labelFontSize: Number(event.target.value) })}
         />
       </label>
-
-      <label>
-        Label interval
-        <select
-          className="text-input"
-          value={contourConfig.labelIntervalMode}
-          onChange={(event) =>
-            setContourConfig((previous) => ({
-              ...previous,
-              labelIntervalMode: event.target.value as LabelIntervalMode,
-            }))
-          }
-        >
-          <option value="all">All visible contours</option>
-          <option value="10m">10 m</option>
-          <option value="100m">100 m</option>
-          <option value="custom">Custom</option>
-        </select>
-      </label>
-
-      {contourConfig.labelIntervalMode === "custom" && (
-        <label>
-          Custom label interval (m)
-          <input
-            className="text-input"
-            type="number"
-            min={1}
-            value={contourConfig.customLabelInterval}
-            onChange={(event) =>
-              setContourConfig((previous) => ({
-                ...previous,
-                customLabelInterval: Number(event.target.value) || 1,
-              }))
-            }
-          />
-        </label>
-      )}
     </>
   );
 }
 
 export default ContourControlsPanel;
+

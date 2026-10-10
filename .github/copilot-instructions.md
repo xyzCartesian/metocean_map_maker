@@ -6,8 +6,7 @@ Vite + React + TypeScript web tool for producing publishable metocean maps (bath
 
 - Dev: `npm run dev`
 - Build: `npm run build` (`tsc -b && vite build`)
-- Contour tile server (from the folder containing the mbtiles):
-  `docker run --rm -it -p 8080:8080 -v "${PWD}:/data" maptiler/tileserver-gl-light --file /data/gebco-contours.mbtiles`
+- No tile server needed: contours are a static PMTiles file served by Vite from `public/tiles/`, loaded via MapLibre's pmtiles protocol.
 
 ## Structure
 
@@ -16,12 +15,15 @@ Vite + React + TypeScript web tool for producing publishable metocean maps (bath
 - `src/utils/mapExport.ts` — PNG/PDF export pipeline
 - `src/utils/importMarkersFromCsv.ts` — CSV import (papaparse)
 - `src/data/`, `src/types/`, `src/styles/` — marker categories/styles, shared types, panel CSS
-- `public/tiles/gebco-colour/` — pre-rendered bathymetry colourmap PNG tiles (z0–10), served by Vite at `/tiles/gebco-colour/{z}/{x}/{y}.png`
+- `public/tiles/gebco-contours.pmtiles` — global contour PMTiles (z0–9, ~2.6 GB), loaded via `pmtiles:///tiles/gebco-contours.pmtiles`
+- `public/tiles/gebco-colour/` — bathymetry colourmap PNG tiles: global z0–7 + regional z8–10 detail (~338 MB), served by Vite at `/tiles/gebco-colour/{z}/{x}/{y}.png`
+- Both tile assets are **gitignored** (`*.pmtiles`, `*.mbtiles`, `public/tiles/gebco-colour/`) and untracked — host on static storage (R2/S3), never in git. Rebuild via the `/gebco-bathymetry-pipeline` skill in `.github/skills/`.
 
 ## Hard-won facts (do not re-learn)
 
-- **Contour tileset real maxzoom is 7** (verify: `http://localhost:8080/data/gebco-contours.json`). Source must declare `maxzoom: 7` so MapLibre *overzooms* z7 tiles instead of 404ing z8+ requests — wrong maxzoom makes contours vanish when zooming or when the draw-box export zooms in.
-- **Current tileset is regional**, bounds `[15, -45, 30, -30]` (tippecanoe `-zg --drop-densest-as-needed`). A global rebuild is planned.
+- **Contour archive: global z0–9 PMTiles** (`gebco-contours-v2.pmtiles`, 2.6 GB, 7.88M features, depth -10900 to -10). App.tsx declares `maxzoom: 9` — must match the archive's real maxzoom or the layer 404s and vanishes at high zoom. Verify any archive via `docker run --rm -v <dir>:/data protomaps/go-pmtiles:latest show /data/<file>.pmtiles`.
+- **Contour depth values are NEGATIVE** (below sea level). Filters must use `abs(round(depth))` before modulo — plain `%` on negatives matches nothing (that bug killed contour labels + interval filtering). Contours exist at 10m intervals (0 to -100m) and 100m intervals (-100 to -10900m); `buildContourFilter(shallowStep, deepStep)` handles the two zones.
+- **Contour controls model**: `shallowStep`/`deepStep` multipliers + `showAllContours` + `adaptiveZoom` (zoom-banded thinning: z<3 → 1000m/2000m up to full density past z7). See `getAdaptiveSteps` in App.tsx.
 - **Markers are DOM overlays** (`maplibregl.Marker`), not part of the WebGL canvas — so `canvas.toDataURL()` does not capture them. Export re-draws them manually in `drawMarkersOnCanvas` via `map.project()`. Same applies to NavigationControl/ScaleControl (that's why compass + scale bar are hand-drawn into exports).
 - **Export capture requires `canvasContextAttributes: { preserveDrawingBuffer: true }`** on the map (nested under canvasContextAttributes, NOT a top-level MapOptions key). Never use html2canvas on the map — it can't read WebGL.
 - **Export byte budget**: target ≤ ~3.8 MB (`fitCanvasToByteBudget`, floor = 60% of requested resolution, smoothing off so thin contour lines survive). PDF embeds JPEG q0.85. DPI presets 150/300/600, default 300. `UI_ELEMENT_SCALE = 1.5` sizes the compass/scale bar.
@@ -30,6 +32,6 @@ Vite + React + TypeScript web tool for producing publishable metocean maps (bath
 
 ## Conventions
 
-- Panels are collapsible sections in the left `.control-panel`; ExportPanel is a floating widget top-right (next to zoom controls).
-- Contour filters use modulo expressions on `abs(round(depth))`.
+- Panels are a left icon rail (`control-panel-rail` + `control-panel-content`); ExportPanel is a floating widget top-right (next to zoom controls).
+- Contour filters use modulo expressions on `abs(round(depth))` — see `buildContourFilter` in App.tsx.
 - Cursor lat/lon indicator is a DOM div bottom-right — intentionally excluded from exports (exports only capture the map canvas).

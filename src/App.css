@@ -177,6 +177,21 @@ body,
   font-weight: bold;
 }
 
+.contour-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.contour-checkbox input[type="checkbox"] {
+  margin: 0;
+}
+
+.range-input {
+  width: 100%;
+  margin-top: 4px;
+}
+
 
 .metocean-marker-wrapper {
   position:relative;

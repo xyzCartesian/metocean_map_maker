@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Large tile assets (hosted separately, not in git)
+*.pmtiles
+*.mbtiles
+public/tiles/gebco-colour/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
