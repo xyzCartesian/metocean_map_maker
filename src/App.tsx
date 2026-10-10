@@ -6,6 +6,10 @@ import { importMarkersFromCsv } from "./utils/importMarkersFromCsv";
 import {
   ChevronDown,
   ChevronRight,
+  Layers,
+  MapPin,
+  MapPinned,
+  WavesHorizontal,
 } from "lucide-react"
 
 import type { MarkerCategory } from "./types/MarkerCategory";
@@ -148,6 +152,9 @@ function App() {
     markerStyles: false,
     contourProperties: false,
   });
+
+  type ControlTab = "layers" | "addPoints" | "pointControls" | "contours";
+  const [activeTab, setActiveTab] = useState<ControlTab | null>(null);
 
   const [basemap, setBasemap] = useState<"openstreetmap" | "topographic" | "satellite">("openstreetmap");
   const [bathymetryMode, setBathymetryMode] = useState<"none" | "colourmap" | "contours" | "colourmap+contours">("none");
@@ -696,247 +703,279 @@ function addBathymetryColourmap() {
       />
 
       <div className="control-panel">
-        <h2>Metocean Map Maker</h2>
-
-        <div
-          className="section-header"
-          onClick={() => toggleSection("mapLayers")}
-        >
-          {panelSections.mapLayers
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Map layers
-        </div>
-
-        <label>
-          Basemap
-          <select
-            className="text-input"
-            value={basemap}
-            onChange={(event) =>
-              setBasemap(event.target.value as "openstreetmap" | "topographic" | "satellite")
-            }
-          >
-            <option value="openstreetmap">OpenStreetMap</option>
-            <option value="topographic">Topographic</option>
-            <option value="satellite">Satellite</option>
-          </select>
-        </label>
-
-        <label>
-        Bathymetry
-          <select
-            className="text-input"
-            value={bathymetryMode}
-            onChange={(event) =>
-              setBathymetryMode(
-                event.target.value as
-                  | "none"
-                  | "colourmap"
-                  | "contours"
-                  | "colourmap+contours"
-              )
-            }
-          >
-            <option value="none">None</option>
-            <option value="colourmap">Colourmap</option>
-            <option value="contours">Contours</option>
-            <option value="colourmap+contours">Colourmap + contours</option>
-          </select>
-      </label>
-
-        <label>
-          Topography
-          <select
-            className="text-input"
-            value={topographyMode}
-            onChange={(event) =>
-              setTopographyMode(event.target.value as "none" | "visible")
-            }
-          >
-            <option value="none">None</option>
-            <option value="visible">Visible</option>
-          </select>
-        </label>
-
-        <div
-          className="section-header"
-          onClick={() => toggleSection("markerVisibility")}
-        >
-          {panelSections["markerVisibility"]
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Marker visibility
-        </div>
-
-        {panelSections["markerVisibility"] && (
-          <MarkerVisibilityPanel
-            markerCategories={markerCategories}
-            visibleCategories={visibleCategories}
-            markerStyles={markerStyles}
-            toggleCategory={toggleCategory}
-          />
-        )}
-
-        <h3>Add point</h3>
-
-        <MarkerForm
-          mode="add"
-          markerCategories={markerCategories}
-          name={pointName}
-          setName={setPointName}
-          label={pointLabel}
-          setLabel={setPointLabel}
-          category={selectedCategory}
-          setCategory={setSelectedCategory}
-          lat={pointLat}
-          setLat={setPointLat}
-          lon={pointLon}
-          setLon={setPointLon}
-          showCoordinates
-        />
-
-        <div className="add-point-actions">
-          <button className="primary-button" onClick={addPointFromCoordinates}>
-            Add point from coordinates
-          </button>
-
+        <div className="control-panel-rail">
           <button
-            className={
-              addingPoint ? "primary-button active-button" : "primary-button"
-            }
-            onClick={() => setAddingPoint(true)}
+            type="button"
+            className={`rail-button${activeTab === "layers" ? " active" : ""}`}
+            onClick={() => setActiveTab(activeTab === "layers" ? null : "layers")}
+            title="Layers"
           >
-            Add point by clicking map
+            <Layers size={20} />
+          </button>
+          <button
+            type="button"
+            className={`rail-button${activeTab === "addPoints" ? " active" : ""}`}
+            onClick={() => setActiveTab(activeTab === "addPoints" ? null : "addPoints")}
+            title="Add points"
+          >
+            <MapPin size={20} />
+            {addingPoint && <span className="rail-badge" />}
+          </button>
+          <button
+            type="button"
+            className={`rail-button${activeTab === "pointControls" ? " active" : ""}`}
+            onClick={() => setActiveTab(activeTab === "pointControls" ? null : "pointControls")}
+            title="Point controls"
+          >
+            <MapPinned size={20} />
+          </button>
+          <button
+            type="button"
+            className={`rail-button${activeTab === "contours" ? " active" : ""}`}
+            onClick={() => setActiveTab(activeTab === "contours" ? null : "contours")}
+            title="Contour controls"
+          >
+            <WavesHorizontal size={20} />
           </button>
         </div>
 
-        {addingPoint && (
-          <p className="instruction-text">
-            Click a location on the map to place the marker.
-          </p>
+        {activeTab && (
+          <div className="control-panel-content">
+            {activeTab === "layers" && (
+              <>
+                <h2>Layers</h2>
+
+                <label>
+                  Basemap
+                  <select
+                    className="text-input"
+                    value={basemap}
+                    onChange={(event) =>
+                      setBasemap(event.target.value as "openstreetmap" | "topographic" | "satellite")
+                    }
+                  >
+                    <option value="openstreetmap">OpenStreetMap</option>
+                    <option value="topographic">Topographic</option>
+                    <option value="satellite">Satellite</option>
+                  </select>
+                </label>
+
+                <label>
+                Bathymetry
+                  <select
+                    className="text-input"
+                    value={bathymetryMode}
+                    onChange={(event) =>
+                      setBathymetryMode(
+                        event.target.value as
+                          | "none"
+                          | "colourmap"
+                          | "contours"
+                          | "colourmap+contours"
+                      )
+                    }
+                  >
+                    <option value="none">None</option>
+                    <option value="colourmap">Colourmap</option>
+                    <option value="contours">Contours</option>
+                    <option value="colourmap+contours">Colourmap + contours</option>
+                  </select>
+              </label>
+
+                <label>
+                  Topography
+                  <select
+                    className="text-input"
+                    value={topographyMode}
+                    onChange={(event) =>
+                      setTopographyMode(event.target.value as "none" | "visible")
+                    }
+                  >
+                    <option value="none">None</option>
+                    <option value="visible">Visible</option>
+                  </select>
+                </label>
+
+                <div
+                  className="section-header"
+                  onClick={() => toggleSection("markerVisibility")}
+                >
+                  {panelSections["markerVisibility"]
+                    ? <ChevronDown size={16} />
+                    : <ChevronRight size={16} />
+                  }
+                  Marker visibility
+                </div>
+
+                {panelSections["markerVisibility"] && (
+                  <MarkerVisibilityPanel
+                    markerCategories={markerCategories}
+                    visibleCategories={visibleCategories}
+                    markerStyles={markerStyles}
+                    toggleCategory={toggleCategory}
+                  />
+                )}
+              </>
+            )}
+
+            {activeTab === "addPoints" && (
+              <>
+                <h2>Add points</h2>
+
+                <MarkerForm
+                  mode="add"
+                  markerCategories={markerCategories}
+                  name={pointName}
+                  setName={setPointName}
+                  label={pointLabel}
+                  setLabel={setPointLabel}
+                  category={selectedCategory}
+                  setCategory={setSelectedCategory}
+                  lat={pointLat}
+                  setLat={setPointLat}
+                  lon={pointLon}
+                  setLon={setPointLon}
+                  showCoordinates
+                />
+
+                <div className="add-point-actions">
+                  <button className="primary-button" onClick={addPointFromCoordinates}>
+                    Add point from coordinates
+                  </button>
+
+                  <button
+                    className={
+                      addingPoint ? "primary-button active-button" : "primary-button"
+                    }
+                    onClick={() => setAddingPoint(true)}
+                  >
+                    Add point by clicking map
+                  </button>
+                </div>
+
+                {addingPoint && (
+                  <p className="instruction-text">
+                    Click a location on the map to place the marker.
+                  </p>
+                )}
+
+                {editingMarkerId !== null && (
+                 <MarkerForm
+                  mode="edit"
+                  markerCategories={markerCategories}
+                  name={editName}
+                  setName={setEditName}
+                  label={editLabel}
+                  setLabel={setEditLabel}
+                  category={editCategory}
+                  setCategory={setEditCategory}
+                  lat={editLat}
+                  setLat={setEditLat}
+                  lon={editLon}
+                  setLon={setEditLon}
+                  onSubmit={saveEditedMarker}
+                  onCancel={cancelEditingMarker}
+                  submitLabel="Save changes"
+                  cancelLabel="Cancel edit"
+                  showCoordinates
+                />
+              )}
+
+                <h3>Import CSV</h3>
+
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvImport}
+                />
+              </>
+            )}
+
+            {activeTab === "pointControls" && (
+              <>
+                <h2>Point controls</h2>
+
+                <div
+                  className="section-header"
+                  onClick={() => toggleSection("markersByCategory")}
+                >
+                  {panelSections["markersByCategory"]
+                    ? <ChevronDown size={16} />
+                    : <ChevronRight size={16} />
+                  }
+                  Markers by category
+                </div>
+
+                {panelSections["markersByCategory"] && (
+                <MarkersByCategoryPanel
+                  markers={markers}
+                  markerCategories={markerCategories}
+                  markerStyles={markerStyles}
+                  startEditingMarker={startEditingMarker}
+                  deleteMarker={deleteMarker}
+                  getMarkersForCategory={getMarkersForCategory}
+                />
+                )}
+
+                <div
+                  className="section-header"
+                  onClick={() => toggleSection("markerLabels") }
+                >
+                  {panelSections["markerLabels"]
+                    ? <ChevronDown size={16} />
+                    : <ChevronRight size={16} />
+                  }
+                  Marker labels
+                </div>
+
+                {panelSections["markerLabels"] && (
+                <MarkerLabelsPanel
+                  showMarkerLabels={showMarkerLabels}
+                  setShowMarkerLabels={setShowMarkerLabels}
+                  labelFontSize={labelFontSize}
+                  setLabelFontSize={setLabelFontSize}
+                />
+                )}
+
+                <div
+                  className="section-header"
+                  onClick={() => toggleSection("markerStyles") }
+                >
+                  {panelSections["markerStyles"]
+                    ? <ChevronDown size={16} />
+                    : <ChevronRight size={16} />
+                  }
+                  Marker styles
+                </div>
+
+                {panelSections["markerStyles"] && (
+                <MarkerStylesPanel
+                  markerCategories={markerCategories}
+                  markerStyles={markerStyles}
+                  setMarkerStyles={setMarkerStyles}
+                />
+                )}
+
+                <h3>Clear points</h3>
+
+                <button className="secondary-button" onClick={clearMarkers}>
+                  Clear all markers
+                </button>
+              </>
+            )}
+
+            {activeTab === "contours" && (
+              <>
+                <h2>Contour controls</h2>
+                <ContourControlsPanel
+                  contourConfig={contourConfig}
+                  setContourConfig={setContourConfig}
+                />
+              </>
+            )}
+          </div>
         )}
-
-        {editingMarkerId !== null && (
-         <MarkerForm
-          mode="edit"
-          markerCategories={markerCategories}
-          name={editName}
-          setName={setEditName}
-          label={editLabel}
-          setLabel={setEditLabel}
-          category={editCategory}
-          setCategory={setEditCategory}
-          lat={editLat}
-          setLat={setEditLat}
-          lon={editLon}
-          setLon={setEditLon}
-          onSubmit={saveEditedMarker}
-          onCancel={cancelEditingMarker}
-          submitLabel="Save changes"
-          cancelLabel="Cancel edit"
-          showCoordinates
-        />
-      )}
-
-        <h3>Import CSV</h3>
-          
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleCsvImport}  
-        />
-               
-               
-       <h3>Point controls</h3>      
-        <div
-          className="section-header"
-          onClick={() => toggleSection("markersByCategory")}
-        >
-          {panelSections["markersByCategory"]
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Markers by category
-        </div>  
-
-        {panelSections["markersByCategory"] && (
-        <MarkersByCategoryPanel
-          markers={markers}
-          markerCategories={markerCategories}
-          markerStyles={markerStyles}
-          startEditingMarker={startEditingMarker}
-          deleteMarker={deleteMarker}
-          getMarkersForCategory={getMarkersForCategory}
-        />
-        )}  
-
-        <div
-          className="section-header"
-          onClick={() => toggleSection("markerLabels") }
-        >
-          {panelSections["markerLabels"]
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Marker labels
-        </div> 
-
-        {panelSections["markerLabels"] && (
-        <MarkerLabelsPanel
-          showMarkerLabels={showMarkerLabels}
-          setShowMarkerLabels={setShowMarkerLabels}
-          labelFontSize={labelFontSize}
-          setLabelFontSize={setLabelFontSize}
-        />
-        )}
-
-        <div
-          className="section-header"
-          onClick={() => toggleSection("markerStyles") }
-        >
-          {panelSections["markerStyles"]
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Marker styles
-        </div> 
-
-        {panelSections["markerStyles"] && (
-        <MarkerStylesPanel
-          markerCategories={markerCategories}
-          markerStyles={markerStyles}
-          setMarkerStyles={setMarkerStyles}
-        />
-        )}
-        <h3>Contour controls</h3> 
-        <div
-          className="section-header"
-          onClick={() => toggleSection("contourProperties") }
-        >
-          {panelSections["contourProperties"]
-            ? <ChevronDown size={16} />
-            : <ChevronRight size={16} />
-          }
-          Contour properties
-        </div> 
-
-        {panelSections["contourProperties"] && (
-          <ContourControlsPanel
-            contourConfig={contourConfig}
-            setContourConfig={setContourConfig}
-          />
-        )}
-
-        <h3>Clear points</h3>
-
-        <button className="secondary-button" onClick={clearMarkers}>
-          Clear all markers
-        </button>
-        </div>
-
+      </div>
 
       <HelpPanel />
     </>
