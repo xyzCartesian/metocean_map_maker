@@ -11,11 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
+.env.local
+.env.*.local
 
 # Large tile assets (hosted separately, not in git)
 *.pmtiles
 *.mbtiles
-public/tiles/gebco-colour/
+tiles/gebco-colour/
+public/tiles/
 
 # Editor directories and files
 .vscode/*

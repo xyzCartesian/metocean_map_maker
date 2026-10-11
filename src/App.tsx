@@ -49,6 +49,16 @@ const BATHYMETRY_CONTOUR_LABEL_LAYER_ID = "bathymetry-contour-label-layer";
 const pmtilesProtocol = new Protocol();
 maplibregl.addProtocol("pmtiles", pmtilesProtocol.tile);
 
+// Tile hosting: local files in dev, R2-hosted static files in production.
+// Set VITE_TILES_BASE in .env.production, e.g. https://tiles.yourdomain.com
+const TILES_BASE = import.meta.env.VITE_TILES_BASE ?? "";
+const CONTOURS_URL = TILES_BASE
+  ? `pmtiles://${TILES_BASE}/gebco-contours.pmtiles`
+  : "pmtiles:///tiles/gebco-contours.pmtiles";
+const COLOUR_TILES_URL = TILES_BASE
+  ? `${TILES_BASE}/gebco-colour/{z}/{x}/{y}.png`
+  : "/tiles/gebco-colour/{z}/{x}/{y}.png";
+
 // Contours exist at 10m intervals (0 to -100m) and 100m intervals (-100m to -11000m).
 // depth is negative (below sea level), so we use abs() and modulo against the
 // per-zone interval.
@@ -366,7 +376,7 @@ function App() {
     if (bathymetryMode === "contours" || bathymetryMode === "colourmap+contours") {
       mapRef.current.addSource(BATHYMETRY_CONTOUR_SOURCE_ID, {
         type: "vector",
-        url: "pmtiles:///tiles/gebco-contours.pmtiles",
+        url: CONTOURS_URL,
         attribution: "Contours © GEBCO",
         // Tileset goes to z9; beyond that MapLibre overzooms the z9 tile
         // instead of requesting non-existent tiles. Keep this in sync with
@@ -678,7 +688,7 @@ function addBathymetryColourmap() {
 
   mapRef.current.addSource(BATHYMETRY_COLOUR_SOURCE_ID, {
     type: "raster",
-    tiles: ["/tiles/gebco-colour/{z}/{x}/{y}.png"],
+    tiles: [COLOUR_TILES_URL],
     tileSize: 256,
     minzoom: 0,
     maxzoom: 10,
