@@ -18,10 +18,12 @@ Produces the two tile assets the app consumes:
 
 ## Prerequisites
 
-- **OSGeo4W** at `C:\OSGeo4W\bin` (provides `gdal_calc.py`, `gdal_contour`, `ogr2ogr`, `ogrinfo` — GDAL 3.13+ verified)
+- **OSGeo4W** (GDAL 3.13+ verified). Tool locations differ by version — in this install: exe tools (`gdalbuildvrt.exe`, `gdal_contour.exe`, `ogr2ogr.exe`, `ogrinfo.exe`, `gdaldem.exe`, `gdalwarp.exe`) live in `C:\OSGeo4W\bin`, but Python-script tools (`gdal_calc`, `gdal2tiles`) live in `C:\OSGeo4W\apps\Python312\Scripts` with `.exe` wrappers in `bin`. **Easiest: run all raster steps in the OSGeo4W Shell** (Start menu → "OSGeo4W Shell") where everything is on PATH as bare commands. If using PowerShell, call exes by full path and note `python C:\OSGeo4W\bin\python.exe` fails without env bootstrap (use the `.exe` wrappers or OSGeo4W Shell instead).
 - **Docker** with image `indigoag/tippecanoe:latest` (`docker pull indigoag/tippecanoe:latest`)
 - **go-pmtiles** via Docker image `protomaps/go-pmtiles:latest` (for verification) — no separate binary needed since tippecanoe writes `.pmtiles` natively
 - Working folder, conventionally `..\gebco-work\` next to the app repo
+
+Commands below are shown for PowerShell with full exe paths; in the OSGeo4W Shell drop the paths and the `&`.
 
 ## The pipeline (steps)
 
@@ -39,8 +41,8 @@ cd <gebco-work>
 Contouring the full 11km range in one pass is slow; split it:
 
 ```powershell
-python "C:\OSGeo4W\bin\gdal_calc.py" -A gebco_global.vrt --outfile=gebco_deep.tif --calc="where((A>=-11000)*(A<=-100),A,nan)" --NoDataValue=nan --type=Float32
-python "C:\OSGeo4W\bin\gdal_calc.py" -A gebco_global.vrt --outfile=gebco_shallow.tif --calc="where((A>=-100)*(A<=0),A,nan)" --NoDataValue=nan --type=Float32
+& "C:\OSGeo4W\bin\gdal_calc.exe" -A gebco_global.vrt --outfile=gebco_deep.tif --calc="where((A>=-11000)*(A<=-100),A,nan)" --NoDataValue=nan --type=Float32
+& "C:\OSGeo4W\bin\gdal_calc.exe" -A gebco_global.vrt --outfile=gebco_shallow.tif --calc="where((A>=-100)*(A<=0),A,nan)" --NoDataValue=nan --type=Float32
 ```
 
 ### 3. Contour each raster
@@ -132,8 +134,17 @@ Produces `public/tiles/gebco-colour/{z}/{x}/{y}.png`. Currently: global z0–7 +
 
 GEBCO land cells hold real positive elevations, and `gdaldem color-relief` clamps them to the ramp's top entry (white). `-alpha`/`-dstalpha` alone only mask pixels *outside* the grid. Mask elevation > 0 to nodata first:
 
+**Critical: use a numeric placeholder, NOT `nan`.** gdal_calc's expression parser poisons the entire output if you write `where(A<=0,A,nan)` — every pixel becomes nan (silent failure; file looks valid, correct dimensions/nodata tag, but contains no data). Use `-9999` instead; the ramp's `nv` entry maps the dataset nodata → transparent.
+
 ```powershell
-python "C:\OSGeo4W\bin\gdal_calc.py" -A gebco_global.vrt --outfile=gebco_ocean_only.tif --calc="where(A<=0,A,nan)" --NoDataValue=nan --type=Float32 --co COMPRESS=DEFLATE --co TILED=YES
+& "C:\OSGeo4W\apps\Python312\Scripts\gdal_calc.exe" -A gebco_global.vrt --outfile=gebco_ocean_only.tif --calc="where(A<=0,A,-9999)" --NoDataValue=-9999 --type=Float32 --co COMPRESS=DEFLATE --co TILED=YES
+```
+
+**Verify before proceeding** (~saves re-running the 20-min step): sample a known deep-ocean point — must return a real depth, NOT nan:
+
+```powershell
+& "C:\OSGeo4W\bin\gdallocationinfo.exe" gebco_ocean_only.tif -geoloc -30 -20 -valonly
+# Expected: about -4862 (mid-Atlantic). If it prints nan, the mask is broken — do not continue.
 ```
 
 ### C3. Colour ramp needs an nv entry
@@ -155,14 +166,18 @@ Verify alpha before tiling: `gdalinfo gebco_colour_4326.tif -stats` → Band 4 s
 
 ### C5. Reproject to Web Mercator
 
+Do NOT pass `-dstalpha` here — the source already carries an alpha band, and `-dstalpha` can flatten it to uniform 255 (observed: 26.8 GB output with alpha min=max=255). Let band 4 carry through, optionally with `-srcalpha` so alpha also acts as the validity mask:
+
 ```powershell
-& "C:\OSGeo4W\bin\gdalwarp.exe" -t_srs EPSG:3857 -r bilinear -dstalpha gebco_colour_4326.tif gebco_colour_3857.tif -co COMPRESS=DEFLATE -co TILED=YES
+& "C:\OSGeo4W\bin\gdalwarp.exe" -t_srs EPSG:3857 -r bilinear -srcalpha -co COMPRESS=DEFLATE -co TILED=YES gebco_colour_4326.tif gebco_colour_3857.tif
 ```
+
+Verify: `gdalinfo gebco_colour_3857.tif -approx_stats` → Band 4 `STATISTICS_MINIMUM=0`. If 255, alpha was flattened — re-run without `-dstalpha`.
 
 ### C6. Slice XYZ tiles (keep RGBA!)
 
 ```powershell
-python "C:\OSGeo4W\apps\Python312\Scripts\gdal2tiles.py" --xyz -z 0-7 -w none --resampling bilinear gebco_colour_3857.tif tiles\gebco-colour
+& "C:\OSGeo4W\bin\gdal2tiles.exe" --xyz -z 0-7 -w none --resampling bilinear gebco_colour_3857.tif tiles\gebco-colour
 ```
 
 Spot-check a coastal tile with an image viewer — land should be transparent, not white. If PNGs come out RGB-only (no alpha), add `-b 1 -b 2 -b 3 -b 4`... actually gdal2tiles preserves alpha automatically when the source has an alpha band; RGB-only output means the alpha band was lost upstream.
@@ -184,7 +199,9 @@ The colourmap source in `src/App.tsx` (`addBathymetryColourmap`) must have **no 
 | Mid-ocean contours missing at low zoom | `--drop-densest-as-needed` | Rebuild with `--drop-smallest-as-needed` |
 | FlatGeobuf "Cannot rename files" | Tried `-update -append` on FGB | Merge in GPKG first, convert once |
 | "WriteArrowBatch() failed" | `-sql` with CAST into FGB | Skip SQL; convert layer directly |
-| Colourmap shows white over land | Land has real +ve elevations; ramp clamps them to white; `-alpha` only masks outside-grid nodata | gdal_calc `where(A<=0,A,nan)` first (step C2), plus `nv 0 0 0 0` in the ramp (step C3) |
+| Colourmap shows white over land | Land has real +ve elevations; ramp clamps them to white; `-alpha` only masks outside-grid nodata | gdal_calc `where(A<=0,A,-9999)` first (step C2), plus `nv 0 0 0 0` in the ramp (step C3) |
+| gdal_calc output is all nan (file looks valid but empty) | `nan` literal inside `--calc` poisons evaluation | Use a numeric placeholder: `--calc="where(A<=0,A,-9999)" --NoDataValue=-9999` |
+| Colourmap alpha uniform 255 after gdalwarp | `-dstalpha` flattens an existing alpha band | Re-run warp without `-dstalpha`; use `-srcalpha` instead (step C5) |
 | Colourmap only covers a small region | Hardcoded `bounds` on the raster source in App.tsx | Remove `bounds` from `addBathymetryColourmap` |
 
 ## Reference
