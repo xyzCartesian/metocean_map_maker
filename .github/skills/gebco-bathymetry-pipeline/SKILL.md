@@ -120,6 +120,50 @@ The app loads it via MapLibre's pmtiles protocol (`url: "pmtiles:///tiles/gebco-
 
 `maxzoom` on the contour source in `src/App.tsx` **must equal the archive's real maxzoom** (currently 9). Too high → tiles 404 → layer vanishes when zooming/exporting. Verify any archive's true maxzoom with the `show` command in step 8.
 
+## Hosting tiles on Cloudflare R2
+
+Tiles deploy separately from code: `git push` updates the app (Cloudflare Pages), but tile data uploads to the R2 bucket via rclone. Bucket: `metocean-tiles`, served publicly at `https://tiles.seaanalysis.com`.
+
+### R1. One-time rclone setup
+
+```powershell
+winget install rclone     # then close/reopen the terminal
+rclone config             # interactive — see answers below
+```
+
+Answers: `n` (new remote) → name `r2` → storage `s3` → provider `Cloudflare` → manual credentials → paste Access Key ID + Secret (from R2 → Manage R2 API Tokens → Create token with **Object Read & Write** scoped to `metocean-tiles`) → region blank → endpoint `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` → defaults for the rest → `y` → `q`.
+
+### R2. Always pass --s3-no-check-bucket
+
+**The bucket-scoped token cannot do HeadBucket/CreateBucket**, so rclone's preflight check 403s (`api error AccessDenied` on `CreateBucket`). Every rclone command against this remote needs `--s3-no-check-bucket` or it fails before touching any objects. `rclone lsd r2:` also 403s (token can't list all buckets) — test credentials with `rclone lsd r2:metocean-tiles` instead.
+
+### R3. Upload the contour archive
+
+```powershell
+rclone copyto "..\gebco-work\gebco-contours-v2.pmtiles" r2:metocean-tiles/gebco-contours.pmtiles --progress --s3-no-check-bucket
+```
+
+`copyto` renames during upload — the object name must match the app's URL (`gebco-contours.pmtiles`, no version suffix).
+
+### R4. Upload the colour tiles
+
+```powershell
+rclone copy "tiles\gebco-colour" r2:metocean-tiles/gebco-colour/ --progress --transfers 16 --checkers 16 --s3-no-check-bucket
+```
+
+`copy` preserves the `{z}/{x}/{y}.png` tree. Re-running the same command is idempotent — skips already-uploaded files, so it's also the update path for regenerated tiles.
+
+### R5. Verify
+
+```powershell
+rclone lsl r2:metocean-tiles/gebco-contours.pmtiles --s3-no-check-bucket   # ~2.8 GB object
+rclone size r2:metocean-tiles/gebco-colour/ --s3-no-check-bucket          # ~15k objects, ~330 MB
+curl -I "https://tiles.seaanalysis.com/gebco-contours.pmtiles"            # 200 + Accept-Ranges: bytes
+curl -I "https://tiles.seaanalysis.com/gebco-colour/0/0/0.png"            # 200
+```
+
+Note: `https://tiles.seaanalysis.com/` (root path) returning a Cloudflare 404 JSON is normal — there's no object at `/`; it just proves the domain is connected.
+
 ## Colourmap (raster) pipeline
 
 Produces `public/tiles/gebco-colour/{z}/{x}/{y}.png`. Currently: global z0–7 + regional z8–10 detail, ~338 MB.
@@ -203,6 +247,7 @@ The colourmap source in `src/App.tsx` (`addBathymetryColourmap`) must have **no 
 | gdal_calc output is all nan (file looks valid but empty) | `nan` literal inside `--calc` poisons evaluation | Use a numeric placeholder: `--calc="where(A<=0,A,-9999)" --NoDataValue=-9999` |
 | Colourmap alpha uniform 255 after gdalwarp | `-dstalpha` flattens an existing alpha band | Re-run warp without `-dstalpha`; use `-srcalpha` instead (step C5) |
 | Colourmap only covers a small region | Hardcoded `bounds` on the raster source in App.tsx | Remove `bounds` from `addBathymetryColourmap` |
+| rclone 403 AccessDenied on every command | Bucket-scoped API token can't do HeadBucket/CreateBucket preflight | Add `--s3-no-check-bucket` to every command (see R2) |
 
 ## Reference
 
